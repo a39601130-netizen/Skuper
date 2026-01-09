@@ -14,9 +14,10 @@ from telegram.ext import (
     ConversationHandler,
     filters
 )
-from telegram.error import BadRequest
+from telegram.error import BadRequest, NetworkError, TimedOut
 
 import config
+from utils.debug_logger import setup_debug_logging, bug_tracker, log_conversation_state
 from bot.handlers.start import start_command, help_command
 from bot.handlers.transactions import (
     add_command,
@@ -51,9 +52,9 @@ from bot.handlers.advisor import (
     ask_advisor_command,
     advisor_question,
     advisor_ask_callback,
-    advisor_refresh_callback,
-    handle_advisor_text
+    advisor_refresh_callback
 )
+from bot.handlers.debug_commands import bugs_command, clear_bugs_command
 from bot.states import TransactionStates, AdvisorStates
 from bot.keyboards.menus import get_main_menu
 
@@ -68,7 +69,15 @@ logger = logging.getLogger(__name__)
 async def menu_callback(update: Update, context):
     """Обработчик главного меню"""
     query = update.callback_query
-    await query.answer()
+
+    # Обрабатываем устаревшие callback запросы
+    try:
+        await query.answer()
+    except BadRequest as e:
+        if "query is too old" in str(e).lower():
+            logger.warning(f"Устаревший callback query: {e}")
+            return
+        raise
 
     data = query.data
 
@@ -152,8 +161,53 @@ async def handle_text(update: Update, context):
     await handle_quick_input(update, context)
 
 
+async def error_handler(update: object, context):
+    """Глобальный обработчик ошибок"""
+    try:
+        # Получаем информацию об ошибке
+        error = context.error
+        user_id = None
+
+        if update and hasattr(update, 'effective_user'):
+            user_id = update.effective_user.id
+
+        # Логируем в наш трекер багов
+        bug_tracker.log_bug(
+            error=error,
+            context={
+                'user_data': context.user_data,
+                'chat_data': context.chat_data,
+                'update': str(update)
+            },
+            user_id=user_id,
+            handler='global_error_handler'
+        )
+
+        # Игнорируем сетевые ошибки
+        if isinstance(error, (NetworkError, TimedOut)):
+            logger.warning(f"Сетевая ошибка: {error}")
+            return
+
+        # Уведомляем пользователя
+        if update and hasattr(update, 'effective_message'):
+            try:
+                await update.effective_message.reply_text(
+                    "❌ Произошла ошибка. Попробуй /start для перезапуска.\n"
+                    f"Ошибка записана в лог (ID пользователя: {user_id})",
+                    reply_markup=get_main_menu()
+                )
+            except:
+                pass
+
+    except Exception as e:
+        logger.error(f"Ошибка в error_handler: {e}")
+
+
 def main():
     """Запуск бота"""
+    
+    # Настраиваем систему отладки
+    setup_debug_logging()
     
     # Проверяем наличие токена
     if not config.TELEGRAM_BOT_TOKEN:
@@ -173,6 +227,10 @@ def main():
     application.add_handler(CommandHandler("income", income_stats_command))
     application.add_handler(CommandHandler("history", history_command))
     application.add_handler(CommandHandler("advisor", advisor_command))
+    
+    # Команды отладки
+    application.add_handler(CommandHandler("bugs", bugs_command))
+    application.add_handler(CommandHandler("clear_bugs", clear_bugs_command))
     
     # ConversationHandler для добавления транзакции
     add_conv_handler = ConversationHandler(
@@ -258,8 +316,13 @@ def main():
         group=1
     )
 
+
+    # Регистрируем глобальный обработчик ошибок
+    application.add_error_handler(error_handler)
+
     # Запуск бота
-    logger.info("🤖 Budget Bot запущен!")
+    logger.info("🤖 Budget Bot запущен с системой отладки!")
+    logger.info(f"📂 Логи сохраняются в: logs/debug.log и logs/bugs.json")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 

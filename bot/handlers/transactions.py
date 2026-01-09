@@ -5,6 +5,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 from datetime import datetime
+from utils.debug_logger import bug_tracker, log_conversation_state
 from bot.keyboards.menus import (
     get_add_menu, 
     get_accounts_keyboard, 
@@ -103,70 +104,90 @@ async def handle_quick_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def select_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора типа транзакции"""
     query = update.callback_query
-    await query.answer()
-    
     user_id = query.from_user.id
-    data = query.data
-    trans = get_user_transaction(user_id)
-    trans.reset()
-    
-    logger.info(f"select_type: {data}")
-    
-    if data == "add_expense":
-        trans.trans_type = "Расход"
-        await query.edit_message_text(
-            "💸 **Расход**\n\n📅 Выбери дату:",
-            parse_mode="Markdown",
-            reply_markup=get_date_keyboard()
-        )
-        return TransactionStates.SELECT_DATE
-        
-    elif data == "add_income":
-        trans.trans_type = "Доход"
-        await query.edit_message_text(
-            "💰 **Доход**\n\n📅 Выбери дату:",
-            parse_mode="Markdown",
-            reply_markup=get_date_keyboard()
-        )
-        return TransactionStates.SELECT_DATE
-        
-    elif data == "add_transfer":
-        trans.trans_type = "Перевод"
-        await query.edit_message_text(
-            "🔄 **Перевод**\n\n📅 Выбери дату:",
-            parse_mode="Markdown",
-            reply_markup=get_date_keyboard()
-        )
-        return TransactionStates.SELECT_DATE
-    
-    return ConversationHandler.END
+
+    try:
+        await query.answer()
+
+        data = query.data
+        trans = get_user_transaction(user_id)
+        trans.reset()
+
+        log_conversation_state(user_id, "SELECT_TYPE", "select_type_callback", {"data": data})
+
+        if data == "add_expense":
+            trans.trans_type = "Расход"
+            await query.edit_message_text(
+                "💸 **Расход**\n\n📅 Выбери дату:",
+                parse_mode="Markdown",
+                reply_markup=get_date_keyboard()
+            )
+            return TransactionStates.SELECT_DATE
+
+        elif data == "add_income":
+            trans.trans_type = "Доход"
+            await query.edit_message_text(
+                "💰 **Доход**\n\n📅 Выбери дату:",
+                parse_mode="Markdown",
+                reply_markup=get_date_keyboard()
+            )
+            return TransactionStates.SELECT_DATE
+
+        elif data == "add_transfer":
+            trans.trans_type = "Перевод"
+            await query.edit_message_text(
+                "🔄 **Перевод**\n\n📅 Выбери дату:",
+                parse_mode="Markdown",
+                reply_markup=get_date_keyboard()
+            )
+            return TransactionStates.SELECT_DATE
+
+        return ConversationHandler.END
+
+    except Exception as e:
+        bug_tracker.log_bug(e, {"trans_data": trans.to_dict()}, user_id, "select_type_callback")
+        await query.message.reply_text("❌ Ошибка. Попробуй /add снова.")
+        return ConversationHandler.END
 
 
 async def select_date_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора даты"""
     query = update.callback_query
-    await query.answer()
-    
     user_id = query.from_user.id
-    data = query.data
-    trans = get_user_transaction(user_id)
-    
-    logger.info(f"select_date: {data}")
-    
-    if data == "date_custom":
-        await query.edit_message_text(
-            f"📆 **{trans.trans_type}**\n\nВведи день месяца (1-31):",
-            parse_mode="Markdown"
-        )
+
+    try:
+        await query.answer()
+
+        data = query.data
+        trans = get_user_transaction(user_id)
+
+        log_conversation_state(user_id, "SELECT_DATE", "select_date_callback", {
+            "data": data,
+            "trans_type": trans.trans_type
+        })
+
+        if data == "date_custom":
+            await query.edit_message_text(
+                f"📆 **{trans.trans_type}**\n\nВведи день месяца (1-31):",
+                parse_mode="Markdown"
+            )
+            return TransactionStates.SELECT_DATE
+
+        elif data.startswith("date_"):
+            day = int(data.replace("date_", ""))
+            trans.day = day
+
+            return await proceed_after_date(query, trans, day)
+
         return TransactionStates.SELECT_DATE
-    
-    elif data.startswith("date_"):
-        day = int(data.replace("date_", ""))
-        trans.day = day
-        
-        return await proceed_after_date(query, trans, day)
-    
-    return TransactionStates.SELECT_DATE
+
+    except Exception as e:
+        bug_tracker.log_bug(e, {
+            "trans_data": trans.to_dict() if trans else None,
+            "callback_data": data
+        }, user_id, "select_date_callback")
+        await query.message.reply_text("❌ Ошибка. Попробуй /add снова.")
+        return ConversationHandler.END
 
 
 async def proceed_after_date(query, trans, day):
@@ -462,19 +483,23 @@ async def enter_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ввода суммы"""
     user_id = update.effective_user.id
     trans = get_user_transaction(user_id)
-    
+
     try:
         amount_text = update.message.text.replace(",", ".").strip()
         amount = float(amount_text)
-        
+
+        log_conversation_state(user_id, "ENTER_AMOUNT", "enter_amount", {
+            "amount_text": amount_text,
+            "amount": amount,
+            "trans_type": trans.trans_type
+        })
+
         if amount <= 0:
             await update.message.reply_text("❌ Сумма должна быть положительной!")
             return TransactionStates.ENTER_AMOUNT
-        
+
         trans.amount = amount
-        
-        logger.info(f"enter_amount: {amount}, type={trans.trans_type}")
-        
+
         # Для дохода спрашиваем категорию
         if trans.trans_type == "Доход":
             # Загружаем категории доходов из Google Sheets
@@ -484,7 +509,8 @@ async def enter_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 income_categories = [c["name"] for c in all_categories if c["type"] == "Доход"]
                 if not income_categories:
                     income_categories = ["Зарплата/Чаевые", "Подработка", "Другое"]
-            except:
+            except Exception as e:
+                logger.error(f"Ошибка загрузки категорий: {e}")
                 income_categories = ["Зарплата/Чаевые", "Подработка", "Другое"]
 
             await update.message.reply_text(
@@ -496,7 +522,7 @@ async def enter_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             )
             return TransactionStates.SELECT_CATEGORY
-        
+
         # Для расхода и перевода - к комментарию
         await update.message.reply_text(
             f"💵 Сумма: **{amount}** BYN\n\n"
@@ -504,13 +530,21 @@ async def enter_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
         return TransactionStates.ENTER_COMMENT
-        
+
     except ValueError:
         await update.message.reply_text(
             "❌ Неверный формат суммы!\nВведи число: `150` или `99.50`",
             parse_mode="Markdown"
         )
         return TransactionStates.ENTER_AMOUNT
+
+    except Exception as e:
+        bug_tracker.log_bug(e, {
+            "trans_data": trans.to_dict(),
+            "input_text": update.message.text
+        }, user_id, "enter_amount")
+        await update.message.reply_text("❌ Ошибка. Попробуй /add снова.")
+        return ConversationHandler.END
 
 
 async def enter_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
