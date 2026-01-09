@@ -225,9 +225,10 @@ class GoogleSheetsService:
         data = sheet.get_all_values()
 
         transactions = []
-        for row in data[3:]:  # Пропускаем настройки и заголовки
+        for idx, row in enumerate(data[3:], start=4):  # Пропускаем настройки и заголовки, начинаем с 4-й строки
             if row[0] and row[0].strip():
                 transactions.append({
+                    "row_index": idx,  # Номер строки в таблице (1-based)
                     "day": row[0],
                     "type": row[1],
                     "account": row[2],
@@ -240,6 +241,25 @@ class GoogleSheetsService:
                 })
 
         return transactions[-limit:][::-1]  # Последние N, в обратном порядке
+
+    def delete_transaction(self, row_index: int) -> bool:
+        """
+        Удалить транзакцию из таблицы
+
+        Args:
+            row_index: Номер строки в таблице (1-based)
+
+        Returns:
+            bool: Успех операции
+        """
+        try:
+            sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
+            sheet.delete_rows(row_index)
+            return True
+
+        except Exception as e:
+            print(f"Ошибка удаления транзакции: {e}")
+            return False
 
     def get_income_by_days(self) -> Dict[str, Any]:
         """Получить доходы по дням с детализацией"""

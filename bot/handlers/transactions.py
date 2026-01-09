@@ -41,6 +41,19 @@ async def add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return TransactionStates.SELECT_TYPE
 
 
+async def menu_add_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка нажатия кнопки 'Добавить' из главного меню"""
+    query = update.callback_query
+    await query.answer()
+
+    await query.edit_message_text(
+        "➕ **Добавить транзакцию**\n\nВыбери тип:",
+        parse_mode="Markdown",
+        reply_markup=get_add_menu()
+    )
+    return TransactionStates.SELECT_TYPE
+
+
 async def handle_quick_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка быстрого текстового ввода"""
     text = update.message.text
@@ -257,7 +270,7 @@ async def enter_custom_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def select_account_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка выбора счета (для доходов и переводов)"""
+    """Обработка выбора счета (для доходов, расходов и переводов)"""
     query = update.callback_query
     await query.answer()
 
@@ -266,6 +279,21 @@ async def select_account_callback(update: Update, context: ContextTypes.DEFAULT_
     trans = get_user_transaction(user_id)
 
     logger.info(f"select_account: {data}")
+
+    # Выбор счета для расхода
+    if data.startswith("expense_"):
+        account = data.replace("expense_", "")
+        trans.account = account
+
+        day_str = f" (📅 {trans.day} число)" if trans.day else ""
+        await query.edit_message_text(
+            f"💸 **Расход**{day_str}\n"
+            f"📁 Категория: {trans.category}\n"
+            f"💳 Счёт: {account}\n\n"
+            f"💵 Введи сумму:",
+            parse_mode="Markdown"
+        )
+        return TransactionStates.ENTER_AMOUNT
 
     # Выбор счета для дохода
     if data.startswith("income_"):
@@ -336,13 +364,18 @@ async def select_category_callback(update: Update, context: ContextTypes.DEFAULT
     """Обработка выбора категории"""
     query = update.callback_query
     await query.answer()
-    
+
     user_id = query.from_user.id
     data = query.data
     trans = get_user_transaction(user_id)
-    
+
     logger.info(f"select_category: {data}")
-    
+
+    # Если транзакция не инициализирована (вход через quick кнопку)
+    if not trans.trans_type:
+        trans.trans_type = "Расход"
+        trans.day = datetime.now().day
+
     # Кнопка "Все категории"
     if data == "show_all_categories":
         try:
@@ -350,9 +383,9 @@ async def select_category_callback(update: Update, context: ContextTypes.DEFAULT
             refs = sheets.get_references()
             categories = refs["categories"]
         except:
-            categories = ["Продукты", "Кафе", "Транспорт", "Такси", "Досуг", "Покупки", 
+            categories = ["Продукты", "Кафе", "Транспорт", "Такси", "Досуг", "Покупки",
                          "Здоровье", "Связь", "ЖКХ", "Одежда"]
-        
+
         day_str = f" (📅 {trans.day} число)" if trans.day else ""
         await query.edit_message_text(
             f"💸 **Расход**{day_str}\n\nВыбери категорию:",
@@ -360,21 +393,33 @@ async def select_category_callback(update: Update, context: ContextTypes.DEFAULT
             reply_markup=get_categories_keyboard(categories, "Расход")
         )
         return TransactionStates.SELECT_CATEGORY
-    
+
     if data.startswith("quick_"):
         category = data.replace("quick_", "")
         trans.category = category
-        
+
+        # Показываем выбор счёта для расхода
+        try:
+            sheets = get_sheets_service()
+            refs = sheets.get_references()
+            accounts = refs["accounts"]
+        except:
+            accounts = ["Наличные", "Карта", "Карта Сбер"]
+
+        day_str = f" (📅 {trans.day} число)" if trans.day else ""
         await query.edit_message_text(
-            f"💸 **Расход** → {category}\n\n💵 Введи сумму:",
-            parse_mode="Markdown"
+            f"💸 **Расход**{day_str}\n"
+            f"📁 Категория: {category}\n\n"
+            f"💳 С какого счёта списать?",
+            parse_mode="Markdown",
+            reply_markup=get_accounts_keyboard(accounts, "expense")
         )
-        return TransactionStates.ENTER_AMOUNT
-    
+        return TransactionStates.SELECT_ACCOUNT
+
     elif data.startswith("cat_"):
         category = data.replace("cat_", "")
         trans.category = category
-        
+
         # Если это ДОХОД и сумма уже введена - идём к комментарию
         if trans.trans_type == "Доход" and trans.amount is not None:
             await query.edit_message_text(
@@ -384,13 +429,32 @@ async def select_category_callback(update: Update, context: ContextTypes.DEFAULT
                 parse_mode="Markdown"
             )
             return TransactionStates.ENTER_COMMENT
-        
+
+        # Для расхода показываем выбор счёта
+        if trans.trans_type == "Расход":
+            try:
+                sheets = get_sheets_service()
+                refs = sheets.get_references()
+                accounts = refs["accounts"]
+            except:
+                accounts = ["Наличные", "Карта", "Карта Сбер"]
+
+            day_str = f" (📅 {trans.day} число)" if trans.day else ""
+            await query.edit_message_text(
+                f"💸 **Расход**{day_str}\n"
+                f"📁 Категория: {category}\n\n"
+                f"💳 С какого счёта списать?",
+                parse_mode="Markdown",
+                reply_markup=get_accounts_keyboard(accounts, "expense")
+            )
+            return TransactionStates.SELECT_ACCOUNT
+
         await query.edit_message_text(
             f"📁 Категория: {category}\n\n💵 Введи сумму:",
             parse_mode="Markdown"
         )
         return TransactionStates.ENTER_AMOUNT
-    
+
     return TransactionStates.SELECT_CATEGORY
 
 

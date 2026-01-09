@@ -20,6 +20,7 @@ import config
 from bot.handlers.start import start_command, help_command
 from bot.handlers.transactions import (
     add_command,
+    menu_add_callback,
     handle_quick_input,
     select_type_callback,
     select_date_callback,
@@ -41,7 +42,8 @@ from bot.handlers.balance import (
     history_command,
     history_callback,
     income_stats_command,
-    income_stats_callback
+    income_stats_callback,
+    delete_transaction_callback
 )
 from bot.handlers.advisor import (
     advisor_command,
@@ -70,19 +72,16 @@ async def menu_callback(update: Update, context):
 
     data = query.data
 
+    # menu_add обрабатывается в ConversationHandler
+    if data == "menu_add":
+        return
+
     try:
         if data == "menu_main":
             await query.edit_message_text(
                 "🏠 **Главное меню**\n\nВыбери действие:",
                 parse_mode="Markdown",
                 reply_markup=get_main_menu()
-            )
-        elif data == "menu_add":
-            from bot.keyboards.menus import get_add_menu
-            await query.edit_message_text(
-                "➕ **Добавить транзакцию**\n\nВыбери тип:",
-                parse_mode="Markdown",
-                reply_markup=get_add_menu()
             )
         elif data == "menu_balance":
             await balance_callback(update, context)
@@ -179,7 +178,8 @@ def main():
     add_conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("add", add_command),
-            CallbackQueryHandler(select_type_callback, pattern="^add_")
+            CallbackQueryHandler(menu_add_callback, pattern="^menu_add$"),
+            CallbackQueryHandler(select_category_callback, pattern="^(quick_|show_all)")
         ],
         states={
             TransactionStates.SELECT_TYPE: [
@@ -187,10 +187,11 @@ def main():
             ],
             TransactionStates.SELECT_DATE: [
                 CallbackQueryHandler(select_date_callback, pattern="^date_"),
+                CallbackQueryHandler(menu_add_callback, pattern="^menu_add$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_custom_date)
             ],
             TransactionStates.SELECT_ACCOUNT: [
-                CallbackQueryHandler(select_account_callback, pattern="^(from_|income_)")
+                CallbackQueryHandler(select_account_callback, pattern="^(from_|income_|expense_)")
             ],
             TransactionStates.SELECT_TO_ACCOUNT: [
                 CallbackQueryHandler(select_to_account_callback, pattern="^to_")
@@ -215,11 +216,12 @@ def main():
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
-            CallbackQueryHandler(menu_callback, pattern="^menu_")
+            CallbackQueryHandler(menu_callback, pattern="^menu_(main|balance|stats|income|advisor|history|settings)$")
         ],
         per_message=False,
         per_user=True,
-        per_chat=True
+        per_chat=True,
+        conversation_timeout=300
     )
     # Группа 0 - высший приоритет
     application.add_handler(add_conv_handler, group=0)
@@ -243,7 +245,10 @@ def main():
     
     # Callback для кнопок AI советника
     application.add_handler(CallbackQueryHandler(advisor_refresh_callback, pattern="^advisor_refresh$"))
-    
+
+    # Callback для кнопок удаления транзакций
+    application.add_handler(CallbackQueryHandler(delete_transaction_callback, pattern="^delete_"))
+
     # Callback для меню
     application.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu_"))
     

@@ -178,6 +178,24 @@ def get_reply_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+# === ИСТОРИЯ С КНОПКАМИ УДАЛЕНИЯ ===
+def get_history_keyboard(transactions: list) -> InlineKeyboardMarkup:
+    """Клавиатура для истории транзакций с кнопкой удаления последней операции"""
+    keyboard = []
+
+    # Добавляем кнопку удаления только для первой (последней по времени) транзакции
+    if transactions and transactions[0].get("row_index"):
+        row_index = transactions[0].get("row_index")
+        keyboard.append([
+            InlineKeyboardButton("🗑️ Удалить последнюю", callback_data=f"delete_{row_index}")
+        ])
+
+    # Кнопка "Назад в главное меню"
+    keyboard.append([InlineKeyboardButton("◀️ Главное меню", callback_data="menu_main")])
+
+    return InlineKeyboardMarkup(keyboard)
+
+
 # === CALLBACK DATA PATTERNS ===
 # Для использования в хендлерах
 CALLBACK_PATTERNS = {
@@ -186,5 +204,6 @@ CALLBACK_PATTERNS = {
     "select_account": r"^acc_",
     "select_category": r"^cat_",
     "quick_category": r"^quick_",
-    "confirm": r"^confirm_"
+    "confirm": r"^confirm_",
+    "delete": r"^delete_"
 }
