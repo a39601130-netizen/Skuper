@@ -1,0 +1,3 @@
+@echo off
+echo Starting Budget Bot...
+.\venv\Scripts\python.exe main.py

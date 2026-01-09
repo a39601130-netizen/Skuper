@@ -1,0 +1,15 @@
+# Telegram Bot
+python-telegram-bot==20.7
+
+# Google Sheets
+gspread==5.12.4
+oauth2client==4.1.3
+
+# HTTP клиент для DeepSeek (версия автоматически совместимая)
+httpx
+
+# Переменные окружения
+python-dotenv==1.0.0
+
+# Утилиты
+pytz==2024.1
