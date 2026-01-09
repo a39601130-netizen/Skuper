@@ -1,0 +1,30 @@
+# Виртуальное окружение (очень много файлов)
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Чувствительные данные
+.env
+google_credentials.json
+*.key
+*.pem
+
+# Документация (читайте при необходимости)
+*.md
+INSTALL.md
+ARCHITECTURE.md
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.swp
+nul
+
+# Git
+.git/
+.gitignore
+
+# Скрипты запуска
+start_bot.bat
