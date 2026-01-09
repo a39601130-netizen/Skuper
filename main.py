@@ -274,6 +274,7 @@ def main():
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
+            CallbackQueryHandler(menu_add_callback, pattern="^menu_add$"),
             CallbackQueryHandler(menu_callback, pattern="^menu_(main|balance|stats|income|advisor|history|settings)$")
         ],
         per_message=False,

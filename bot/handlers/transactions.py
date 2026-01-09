@@ -47,6 +47,10 @@ async def menu_add_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    # Сбрасываем данные предыдущей незавершённой транзакции
+    user_id = update.effective_user.id
+    user_transactions[user_id] = TransactionData()
+
     await query.edit_message_text(
         "➕ **Добавить транзакцию**\n\nВыбери тип:",
         parse_mode="Markdown",
