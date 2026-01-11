@@ -35,10 +35,11 @@ def get_main_menu() -> InlineKeyboardMarkup:
             InlineKeyboardButton("💰 Доходы", callback_data="menu_income")
         ],
         [
-            InlineKeyboardButton("🤖 AI Советник", callback_data="menu_advisor"),
+            InlineKeyboardButton("📈 Отчет за неделю", callback_data="menu_weekly_report"),
             InlineKeyboardButton("📜 История", callback_data="menu_history")
         ],
         [
+            InlineKeyboardButton("🤖 AI Советник", callback_data="menu_advisor"),
             InlineKeyboardButton("⚙️ Настройки", callback_data="menu_settings")
         ]
     ]

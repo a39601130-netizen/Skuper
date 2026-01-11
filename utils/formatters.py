@@ -122,30 +122,70 @@ def format_transaction_success(
     amount: float,
     category: Optional[str],
     comment: Optional[str],
-    hours: Optional[float] = None
+    hours: Optional[float] = None,
+    account: Optional[str] = None,
+    show_balance: bool = True
 ) -> str:
     """Форматировать сообщение об успешной транзакции"""
-    
+
     emoji = {"Доход": "💰", "Расход": "💸", "Перевод": "🔄"}.get(trans_type, "✅")
-    
+
     lines = [
         "✅ **Записано!**\n",
         f"{emoji} {trans_type}: **{format_money(amount)}**"
     ]
-    
+
     if category:
         lines.append(f"📁 Категория: {category}")
-    
+
     if comment:
         lines.append(f"💬 {comment}")
-    
+
     if hours:
         hourly_rate = 6.5  # Ставка в час
         earned = hours * hourly_rate
         lines.append(f"⏰ Часы: {hours} (= {format_money(earned)} по ставке)")
-    
+
     lines.append(f"📅 {datetime.now().strftime('%d.%m.%Y')}")
-    
+
+    # Показываем баланс и остаток по категории
+    if show_balance:
+        try:
+            from services.sheets import get_sheets_service
+            sheets = get_sheets_service()
+
+            # Получаем баланс счёта
+            if account:
+                accounts = sheets.get_accounts_balance()
+                acc_data = next((a for a in accounts if a["name"] == account), None)
+                if acc_data:
+                    balance = acc_data["current"]
+                    currency = acc_data.get("currency", "BYN")
+                    lines.append(f"\n💳 **{account}:** {format_money(balance, currency)}")
+
+            # Получаем остаток по категории (только для расходов)
+            if category and trans_type == "Расход":
+                categories = sheets.get_categories_budget()
+                cat_data = next((c for c in categories if c["name"] == category and c["type"] == "Расход"), None)
+                if cat_data and cat_data["budget"] > 0:
+                    remaining = cat_data["remaining"]
+                    budget = cat_data["budget"]
+                    spent = cat_data["spent"]
+                    progress = int((spent / budget) * 100) if budget > 0 else 0
+
+                    # Выбираем эмодзи в зависимости от прогресса
+                    if progress >= 100:
+                        status_emoji = "🔴"
+                    elif progress >= 80:
+                        status_emoji = "🟡"
+                    else:
+                        status_emoji = "🟢"
+
+                    lines.append(f"{status_emoji} **{category}:** осталось {format_money(remaining)} из {format_money(budget)} ({progress}%)")
+        except Exception as e:
+            # Если произошла ошибка при получении данных, просто не показываем баланс
+            pass
+
     return "\n".join(lines)
 
 
@@ -196,13 +236,14 @@ def parse_quick_input(text: str) -> Optional[Dict[str, Any]]:
             }
         return None
     
-    # Парсим сумму в начале
-    amount_match = re.match(r'(\d+(?:\.\d+)?)\s+', text)
+    # Парсим сумму в начале (с опциональной валютой: р, руб, byn, бел)
+    # Поддерживаемые форматы: "50 продукты", "50р продукты", "50 р продукты", "100 byn продукты", "100byn продукты"
+    amount_match = re.match(r'(\d+(?:[.,]\d+)?)\s*(?:р|руб|byn|бел|bel)?\s+', text, re.IGNORECASE)
     if not amount_match:
         logger.info("[PARSE] No amount found at beginning")
         return None
 
-    amount = float(amount_match.group(1))
+    amount = float(amount_match.group(1).replace(',', '.'))
     rest = text[amount_match.end():].strip()
 
     logger.info(f"[PARSE] Amount: {amount}, Rest: {rest}")
@@ -226,35 +267,74 @@ def parse_quick_input(text: str) -> Optional[Dict[str, Any]]:
         "зарплата": "Зарплата/Чаевые",
         "зп": "Зарплата/Чаевые",
         "подработка": "Подработка",
-        
+
         # Расходы
         "продукты": "Продукты",
+        "прод": "Продукты",
         "еда": "Продукты",
         "магазин": "Продукты",
+        "маг": "Продукты",
         "кафе": "Кафе",
+        "кафешка": "Кафе",
         "ресторан": "Кафе",
+        "рест": "Кафе",
+        "кофе": "Кафе",
         "досуг": "Досуг",
         "развлечения": "Досуг",
+        "развл": "Досуг",
+        "игры": "Досуг",
+        "кино": "Досуг",
+        "фильм": "Досуг",
         "транспорт": "Транспорт",
+        "тр": "Транспорт",
+        "трансп": "Транспорт",
         "метро": "Транспорт",
         "автобус": "Транспорт",
+        "троллейбус": "Транспорт",
+        "трамвай": "Транспорт",
         "такси": "Такси",
+        "яндекс": "Такси",
+        "убер": "Такси",
         "здоровье": "Здоровье и красота",
+        "здор": "Здоровье и красота",
+        "красота": "Здоровье и красота",
         "аптека": "Аптека",
         "лекарства": "Аптека",
+        "лек": "Аптека",
         "ништяки": "Ништяки",
+        "ништ": "Ништяки",
+        "сладкое": "Ништяки",
         "покупки": "Покупки",
+        "поку": "Покупки",
         "шоппинг": "Покупки",
+        "шопинг": "Покупки",
+        "вещи": "Покупки",
         "аренда": "Аренда",
         "квартира": "Аренда",
+        "арен": "Аренда",
         "коммуналка": "Коммуналка",
+        "комм": "Коммуналка",
+        "ком": "Коммуналка",
+        "жкх": "Коммуналка",
         "интернет": "Интернет и связь",
+        "инет": "Интернет и связь",
         "связь": "Интернет и связь",
         "телефон": "Интернет и связь",
+        "тел": "Интернет и связь",
+        "мобильный": "Интернет и связь",
         "кошки": "Кошки",
         "коты": "Кошки",
+        "кот": "Кошки",
+        "кошка": "Кошки",
+        "котики": "Кошки",
         "долги": "Долги",
-        "долг": "Долги"
+        "долг": "Долги",
+        "одежда": "Одежда",
+        "одеж": "Одежда",
+        "шмот": "Одежда",
+        "подарки": "Подарки",
+        "подар": "Подарки",
+        "подарок": "Подарки"
     }
     
     category = category_map.get(category_input, category_input.capitalize())
@@ -291,7 +371,9 @@ def format_history(transactions: List[Dict[str, Any]]) -> str:
     for t in transactions:
         emoji = {"Доход": "💰", "Расход": "💸", "Перевод": "🔄"}.get(t["type"], "📝")
 
-        line = f"{emoji} {t['day']}.{t.get('month', '?')}: {t['amount']} BYN"
+        # Используем full_date если есть, иначе только день
+        date_str = t.get("full_date") or t['day']
+        line = f"{emoji} {date_str}: {t['amount']} BYN"
 
         if t.get("category"):
             line += f" ({t['category']})"
@@ -345,5 +427,53 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
             if entry.get("comment"):
                 comment_emoji = "💬"
                 lines.append(f"    {comment_emoji} {entry['comment']}")
+
+    return "\n".join(lines)
+
+
+def format_weekly_report(data: Dict[str, Any]) -> str:
+    """Форматировать еженедельный отчет"""
+
+    lines = [
+        "📊 **ОТЧЕТ ЗА НЕДЕЛЮ**",
+        f"📅 {data['start_day']}-{data['end_day']} число\n"
+    ]
+
+    # Общая сводка
+    balance = data['balance']
+    balance_emoji = "📈" if balance >= 0 else "📉"
+
+    lines.append(f"💰 **Доходы:** {format_money(data['total_income'])}")
+    lines.append(f"💸 **Расходы:** {format_money(data['total_expense'])}")
+    lines.append(f"{balance_emoji} **Итого:** {format_money(balance)}\n")
+
+    # Часы работы (если есть)
+    if data['total_hours'] > 0:
+        hourly_rate = 6.5
+        expected = data['total_hours'] * hourly_rate
+        lines.append(f"⏰ **Отработано:** {data['total_hours']:.1f} часов")
+        lines.append(f"   (= {format_money(expected)} по ставке)\n")
+
+    # Доходы по категориям
+    if data['income_by_category']:
+        lines.append("💰 **Доходы по категориям:**")
+        for category, amount in list(data['income_by_category'].items())[:5]:  # Топ-5
+            lines.append(f"  • {category}: {format_money(amount)}")
+        lines.append("")
+
+    # Расходы по категориям
+    if data['expense_by_category']:
+        lines.append("💸 **Расходы по категориям:**")
+        for category, amount in list(data['expense_by_category'].items())[:5]:  # Топ-5
+            lines.append(f"  • {category}: {format_money(amount)}")
+        lines.append("")
+
+    # Мотивационное сообщение
+    if balance > 0:
+        lines.append("✅ Отличная работа! Доходы превышают расходы!")
+    elif balance == 0:
+        lines.append("⚖️ Баланс нулевой - всё что заработал, то и потратил.")
+    else:
+        lines.append("⚠️ Расходы превысили доходы. Держи контроль!")
 
     return "\n".join(lines)

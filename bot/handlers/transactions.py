@@ -61,6 +61,9 @@ async def menu_add_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_quick_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка быстрого текстового ввода"""
+    if not update.message or not update.message.text:
+        return
+
     text = update.message.text
 
     logger.info(f"Quick input received: {text}")
@@ -94,7 +97,8 @@ async def handle_quick_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 amount=parsed["amount"],
                 category=parsed["category"],
                 comment=parsed.get("comment"),
-                hours=parsed.get("hours")
+                hours=parsed.get("hours"),
+                account="Наличные"
             )
             await update.message.reply_text(response, parse_mode="Markdown")
         else:
@@ -149,8 +153,11 @@ async def select_type_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         return ConversationHandler.END
 
     except Exception as e:
-        bug_tracker.log_bug(e, {"trans_data": trans.to_dict()}, user_id, "select_type_callback")
-        await query.message.reply_text("❌ Ошибка. Попробуй /add снова.")
+        bug_tracker.log_bug(e, {"trans_data": trans.to_dict() if 'trans' in dir() else None}, user_id, "select_type_callback")
+        try:
+            await query.edit_message_text("❌ Ошибка. Попробуй /add снова.", reply_markup=get_main_menu())
+        except Exception:
+            await context.bot.send_message(chat_id=user_id, text="❌ Ошибка. Попробуй /add снова.")
         return ConversationHandler.END
 
 
@@ -187,10 +194,13 @@ async def select_date_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     except Exception as e:
         bug_tracker.log_bug(e, {
-            "trans_data": trans.to_dict() if trans else None,
-            "callback_data": data
+            "trans_data": trans.to_dict() if 'trans' in dir() and trans else None,
+            "callback_data": data if 'data' in dir() else None
         }, user_id, "select_date_callback")
-        await query.message.reply_text("❌ Ошибка. Попробуй /add снова.")
+        try:
+            await query.edit_message_text("❌ Ошибка. Попробуй /add снова.", reply_markup=get_main_menu())
+        except Exception:
+            await context.bot.send_message(chat_id=user_id, text="❌ Ошибка. Попробуй /add снова.")
         return ConversationHandler.END
 
 
@@ -667,7 +677,8 @@ async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     amount=trans.amount,
                     category=trans.category,
                     comment=trans.comment,
-                    hours=trans.hours
+                    hours=trans.hours,
+                    account=account
                 )
                 await query.edit_message_text(
                     response,

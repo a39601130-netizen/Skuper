@@ -54,6 +54,11 @@ from bot.handlers.advisor import (
     advisor_ask_callback,
     advisor_refresh_callback
 )
+from bot.handlers.reports import (
+    weekly_report_command,
+    weekly_report_callback,
+    send_weekly_report
+)
 from bot.handlers.debug_commands import bugs_command, clear_bugs_command
 from bot.states import TransactionStates, AdvisorStates
 from bot.keyboards.menus import get_main_menu
@@ -98,6 +103,8 @@ async def menu_callback(update: Update, context):
             await stats_callback(update, context)
         elif data == "menu_income":
             await income_stats_callback(update, context)
+        elif data == "menu_weekly_report":
+            await weekly_report_callback(update, context)
         elif data == "menu_advisor":
             await advisor_callback(update, context)
         elif data == "menu_history":
@@ -118,6 +125,9 @@ async def menu_callback(update: Update, context):
 
 async def handle_text(update: Update, context):
     """Обработчик текстовых сообщений (быстрый ввод)"""
+    if not update.message or not update.message.text:
+        return
+
     text = update.message.text.lower()
     
     # Проверяем, есть ли активный диалог (ConversationHandler)
@@ -227,6 +237,7 @@ def main():
     application.add_handler(CommandHandler("income", income_stats_command))
     application.add_handler(CommandHandler("history", history_command))
     application.add_handler(CommandHandler("advisor", advisor_command))
+    application.add_handler(CommandHandler("weekly", weekly_report_command))
     
     # Команды отладки
     application.add_handler(CommandHandler("bugs", bugs_command))
@@ -275,7 +286,7 @@ def main():
         fallbacks=[
             CommandHandler("cancel", cancel),
             CallbackQueryHandler(menu_add_callback, pattern="^menu_add$"),
-            CallbackQueryHandler(menu_callback, pattern="^menu_(main|balance|stats|income|advisor|history|settings)$")
+            CallbackQueryHandler(menu_callback, pattern="^menu_(main|balance|stats|income|weekly_report|advisor|history|settings)$")
         ],
         per_message=False,
         per_user=True,
@@ -320,6 +331,31 @@ def main():
 
     # Регистрируем глобальный обработчик ошибок
     application.add_error_handler(error_handler)
+
+    # === ПЛАНИРОВЩИК ЗАДАЧ ===
+    # Настраиваем еженедельную отправку отчетов по воскресеньям
+    if config.TELEGRAM_USER_ID:
+        try:
+            from datetime import time
+
+            user_id = int(config.TELEGRAM_USER_ID)
+
+            # Отправка каждое воскресенье в 20:00 (по времени сервера)
+            job_queue = application.job_queue
+            job_queue.run_daily(
+                send_weekly_report,
+                time=time(hour=20, minute=0),
+                days=(6,),  # 6 = воскресенье (0=понедельник, 6=воскресенье)
+                chat_id=user_id,
+                name="weekly_report"
+            )
+
+            logger.info(f"✅ Настроена автоматическая отправка отчетов по воскресеньям в 20:00 для пользователя {user_id}")
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка настройки автоматических отчетов: {e}")
+    else:
+        logger.warning("⚠️ TELEGRAM_USER_ID не задан - автоматические отчеты отключены")
 
     # Запуск бота
     logger.info("🤖 Budget Bot запущен с системой отладки!")

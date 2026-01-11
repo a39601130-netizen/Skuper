@@ -5,7 +5,37 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 from typing import Optional, Dict, List, Any
+from functools import wraps
+import time
+import logging
 import config
+
+logger = logging.getLogger(__name__)
+
+
+def retry_on_error(max_retries: int = 3, delay: float = 1.0):
+    """Декоратор для повторных попыток при ошибках API"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except gspread.exceptions.APIError as e:
+                    last_exception = e
+                    if attempt < max_retries - 1:
+                        wait_time = delay * (attempt + 1)
+                        logger.warning(f"API error in {func.__name__}, retry {attempt + 1}/{max_retries} in {wait_time}s: {e}")
+                        time.sleep(wait_time)
+                except Exception as e:
+                    last_exception = e
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Error in {func.__name__}, retry {attempt + 1}/{max_retries}: {e}")
+                        time.sleep(delay)
+            raise last_exception
+        return wrapper
+    return decorator
 
 
 def safe_float(value, default=0.0) -> float:
@@ -40,12 +70,13 @@ def safe_int(value, default=0) -> int:
 
 class GoogleSheetsService:
     """Сервис для работы с Google Sheets таблицей бюджета"""
-    
+
     def __init__(self):
         self.client = None
         self.spreadsheet = None
+        self._last_connect = 0
         self._connect()
-    
+
     def _connect(self):
         """Подключение к Google Sheets"""
         scope = [
@@ -53,15 +84,24 @@ class GoogleSheetsService:
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
-        
+
         creds = ServiceAccountCredentials.from_json_keyfile_name(
             config.GOOGLE_CREDENTIALS_FILE, scope
         )
         self.client = gspread.authorize(creds)
         self.spreadsheet = self.client.open_by_key(config.GOOGLE_SHEETS_ID)
+        self._last_connect = time.time()
+
+    def _ensure_connection(self):
+        """Переподключение если соединение устарело (>30 мин)"""
+        if time.time() - self._last_connect > 1800:
+            logger.info("Reconnecting to Google Sheets (connection expired)")
+            self._connect()
     
+    @retry_on_error(max_retries=3, delay=1.0)
     def get_references(self) -> Dict[str, List[str]]:
         """Получить справочники (типы, счета, категории)"""
+        self._ensure_connection()
         sheet = self.spreadsheet.worksheet(config.SHEET_REFERENCES)
         data = sheet.get_all_values()
         
@@ -84,8 +124,10 @@ class GoogleSheetsService:
             "categories": categories
         }
     
+    @retry_on_error(max_retries=3, delay=1.0)
     def get_accounts_balance(self) -> List[Dict[str, Any]]:
         """Получить балансы всех счетов"""
+        self._ensure_connection()
         sheet = self.spreadsheet.worksheet(config.SHEET_ACCOUNTS)
         data = sheet.get_all_values()
         
@@ -101,8 +143,10 @@ class GoogleSheetsService:
         
         return accounts
     
+    @retry_on_error(max_retries=3, delay=1.0)
     def get_categories_budget(self) -> List[Dict[str, Any]]:
         """Получить бюджеты и расходы по категориям"""
+        self._ensure_connection()
         sheet = self.spreadsheet.worksheet(config.SHEET_CATEGORIES)
         data = sheet.get_all_values()
         
@@ -120,8 +164,10 @@ class GoogleSheetsService:
         
         return categories
     
+    @retry_on_error(max_retries=3, delay=1.0)
     def get_current_month_settings(self) -> Dict[str, int]:
         """Получить текущий месяц и год из настроек таблицы"""
+        self._ensure_connection()
         sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
         data = sheet.get_all_values()
         
@@ -131,6 +177,7 @@ class GoogleSheetsService:
         
         return {"month": month, "year": year}
     
+    @retry_on_error(max_retries=3, delay=1.0)
     def add_transaction(
         self,
         day: int,
@@ -159,8 +206,9 @@ class GoogleSheetsService:
             bool: Успех операции
         """
         try:
+            self._ensure_connection()
             sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
-            
+
             # Формируем строку данных
             # A: Дата, B: Тип, C: Счёт, D: Категория, E: Сумма, 
             # F: Счёт Куда, G: Комментарий, H: (формула), I: Часы
@@ -219,8 +267,10 @@ class GoogleSheetsService:
             "near_limit": near_limit
         }
     
+    @retry_on_error(max_retries=3, delay=1.0)
     def get_recent_transactions(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Получить последние транзакции"""
+        self._ensure_connection()
         sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
         data = sheet.get_all_values()
 
@@ -242,6 +292,7 @@ class GoogleSheetsService:
 
         return transactions[-limit:][::-1]  # Последние N, в обратном порядке
 
+    @retry_on_error(max_retries=3, delay=1.0)
     def delete_transaction(self, row_index: int) -> bool:
         """
         Удалить транзакцию из таблицы
@@ -253,6 +304,7 @@ class GoogleSheetsService:
             bool: Успех операции
         """
         try:
+            self._ensure_connection()
             sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
             sheet.delete_rows(row_index)
             return True
@@ -261,8 +313,10 @@ class GoogleSheetsService:
             print(f"Ошибка удаления транзакции: {e}")
             return False
 
+    @retry_on_error(max_retries=3, delay=1.0)
     def get_income_by_days(self) -> Dict[str, Any]:
         """Получить доходы по дням с детализацией"""
+        self._ensure_connection()
         sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
         data = sheet.get_all_values()
 
@@ -312,6 +366,76 @@ class GoogleSheetsService:
             "total_income": sum(d["total"] for d in income_by_day.values()),
             "total_tips": sum(d["tips"] for d in income_by_day.values()),
             "total_hours": sum(d["hours"] for d in income_by_day.values())
+        }
+
+    @retry_on_error(max_retries=3, delay=1.0)
+    def get_weekly_summary(self, days_back: int = 7) -> Dict[str, Any]:
+        """
+        Получить сводку за последние N дней
+
+        Args:
+            days_back: Количество дней назад (по умолчанию 7 - неделя)
+
+        Returns:
+            Dict с данными за неделю: доходы, расходы, по категориям
+        """
+        self._ensure_connection()
+        sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
+        data = sheet.get_all_values()
+
+        # Определяем диапазон дней
+        today = datetime.now().day
+        # Вычисляем начало недели (days_back дней назад)
+        start_day = max(1, today - days_back + 1)
+
+        # Собираем транзакции за период
+        total_income = 0
+        total_expense = 0
+        total_hours = 0
+
+        # Группировка по категориям
+        income_by_category = {}
+        expense_by_category = {}
+
+        for row in data[3:]:  # Пропускаем настройки и заголовки
+            if row[0] and row[0].strip() and len(row) > 1:
+                try:
+                    day = int(row[0])
+                except (ValueError, TypeError):
+                    continue
+
+                # Проверяем, входит ли день в диапазон
+                if start_day <= day <= today:
+                    trans_type = row[1]
+                    category = row[3] if len(row) > 3 else ""
+                    amount = safe_float(row[4])
+                    hours = safe_float(row[8]) if len(row) > 8 else 0
+
+                    if trans_type == "Доход":
+                        total_income += amount
+                        total_hours += hours
+                        if category:
+                            income_by_category[category] = income_by_category.get(category, 0) + amount
+
+                    elif trans_type == "Расход":
+                        total_expense += amount
+                        if category:
+                            expense_by_category[category] = expense_by_category.get(category, 0) + amount
+
+        # Сортируем категории по сумме (по убыванию)
+        income_by_category = dict(sorted(income_by_category.items(), key=lambda x: x[1], reverse=True))
+        expense_by_category = dict(sorted(expense_by_category.items(), key=lambda x: x[1], reverse=True))
+
+        return {
+            "start_day": start_day,
+            "end_day": today,
+            "days_count": days_back,
+            "total_income": total_income,
+            "total_expense": total_expense,
+            "total_hours": total_hours,
+            "balance": total_income - total_expense,
+            "income_by_category": income_by_category,
+            "expense_by_category": expense_by_category
         }
 
 
