@@ -29,9 +29,12 @@ from bot.handlers.transactions import (
     select_account_callback,
     select_to_account_callback,
     select_category_callback,
+    select_currency_callback,
     enter_amount,
     enter_comment,
     enter_hours,
+    enter_exchange_rate,
+    enter_amount_to,
     confirm_callback,
     cancel
 )
@@ -215,15 +218,23 @@ async def error_handler(update: object, context):
 
 def main():
     """Запуск бота"""
-    
+
     # Настраиваем систему отладки
     setup_debug_logging()
-    
+
     # Проверяем наличие токена
     if not config.TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN не задан в .env файле!")
         return
-    
+
+    # Инициализируем Google Sheets и добавляем тип "Обмен валюты" если его нет
+    try:
+        from services.sheets import get_sheets_service
+        sheets = get_sheets_service()
+        sheets.ensure_exchange_type_exists()
+    except Exception as e:
+        logger.warning(f"Не удалось проверить справочник типов: {e}")
+
     # Создаем приложение
     application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
     
@@ -260,16 +271,25 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_custom_date)
             ],
             TransactionStates.SELECT_ACCOUNT: [
-                CallbackQueryHandler(select_account_callback, pattern="^(from_|income_|expense_)")
+                CallbackQueryHandler(select_account_callback, pattern="^(from_|income_|expense_|exchange_from_)")
             ],
             TransactionStates.SELECT_TO_ACCOUNT: [
-                CallbackQueryHandler(select_to_account_callback, pattern="^to_")
+                CallbackQueryHandler(select_to_account_callback, pattern="^(to_|exchange_to_)")
             ],
             TransactionStates.SELECT_CATEGORY: [
                 CallbackQueryHandler(select_category_callback, pattern="^(quick_|cat_|show_all)")
             ],
+            TransactionStates.SELECT_CURRENCY: [
+                CallbackQueryHandler(select_currency_callback, pattern="^currency_")
+            ],
             TransactionStates.ENTER_AMOUNT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_amount)
+            ],
+            TransactionStates.ENTER_EXCHANGE_RATE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_exchange_rate)
+            ],
+            TransactionStates.ENTER_AMOUNT_TO: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_amount_to)
             ],
             TransactionStates.ENTER_COMMENT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_comment),

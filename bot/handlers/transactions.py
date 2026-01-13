@@ -7,13 +7,14 @@ from telegram.ext import ContextTypes, ConversationHandler
 from datetime import datetime
 from utils.debug_logger import bug_tracker, log_conversation_state
 from bot.keyboards.menus import (
-    get_add_menu, 
-    get_accounts_keyboard, 
+    get_add_menu,
+    get_accounts_keyboard,
     get_categories_keyboard,
     get_quick_expense_keyboard,
     get_confirm_keyboard,
     get_main_menu,
-    get_date_keyboard
+    get_date_keyboard,
+    get_currency_keyboard
 )
 from bot.states import TransactionStates, TransactionData
 from services.sheets import get_sheets_service
@@ -150,6 +151,15 @@ async def select_type_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             )
             return TransactionStates.SELECT_DATE
 
+        elif data == "add_exchange":
+            trans.trans_type = "Обмен валюты"
+            await query.edit_message_text(
+                "💱 **Обмен валюты**\n\n📅 Выбери дату:",
+                parse_mode="Markdown",
+                reply_markup=get_date_keyboard()
+            )
+            return TransactionStates.SELECT_DATE
+
         return ConversationHandler.END
 
     except Exception as e:
@@ -238,11 +248,26 @@ async def proceed_after_date(query, trans, day):
             accounts = refs["accounts"]
         except:
             accounts = ["Наличные", "Карта", "Карта Сбер"]
-        
+
         await query.edit_message_text(
             f"🔄 **Перевод** (📅 {day} число)\n\n💳 С какого счета списать?",
             parse_mode="Markdown",
             reply_markup=get_accounts_keyboard(accounts, "from")
+        )
+        return TransactionStates.SELECT_ACCOUNT
+
+    elif trans.trans_type == "Обмен валюты":
+        try:
+            sheets = get_sheets_service()
+            refs = sheets.get_references()
+            accounts = refs["accounts"]
+        except:
+            accounts = ["Наличные", "Карта", "Карта Сбер"]
+
+        await query.edit_message_text(
+            f"💱 **Обмен валюты** (📅 {day} число)\n\n💳 С какого счета списать?",
+            parse_mode="Markdown",
+            reply_markup=get_accounts_keyboard(accounts, "exchange_from")
         )
         return TransactionStates.SELECT_ACCOUNT
 
@@ -291,14 +316,29 @@ async def enter_custom_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 accounts = refs["accounts"]
             except:
                 accounts = ["Наличные", "Карта", "Карта Сбер"]
-            
+
             await update.message.reply_text(
                 f"🔄 **Перевод** (📅 {day} число)\n\n💳 С какого счета списать?",
                 parse_mode="Markdown",
                 reply_markup=get_accounts_keyboard(accounts, "from")
             )
             return TransactionStates.SELECT_ACCOUNT
-        
+
+        elif trans.trans_type == "Обмен валюты":
+            try:
+                sheets = get_sheets_service()
+                refs = sheets.get_references()
+                accounts = refs["accounts"]
+            except:
+                accounts = ["Наличные", "Карта", "Карта Сбер"]
+
+            await update.message.reply_text(
+                f"💱 **Обмен валюты** (📅 {day} число)\n\n💳 С какого счета списать?",
+                parse_mode="Markdown",
+                reply_markup=get_accounts_keyboard(accounts, "exchange_from")
+            )
+            return TransactionStates.SELECT_ACCOUNT
+
     except ValueError:
         await update.message.reply_text("❌ Введи число от 1 до 31!")
         return TransactionStates.SELECT_DATE
@@ -325,10 +365,11 @@ async def select_account_callback(update: Update, context: ContextTypes.DEFAULT_
             f"💸 **Расход**{day_str}\n"
             f"📁 Категория: {trans.category}\n"
             f"💳 Счёт: {account}\n\n"
-            f"💵 Введи сумму:",
-            parse_mode="Markdown"
+            f"🏦 В какой валюте расход?",
+            parse_mode="Markdown",
+            reply_markup=get_currency_keyboard()
         )
-        return TransactionStates.ENTER_AMOUNT
+        return TransactionStates.SELECT_CURRENCY
 
     # Выбор счета для дохода
     if data.startswith("income_"):
@@ -365,24 +406,46 @@ async def select_account_callback(update: Update, context: ContextTypes.DEFAULT_
         )
         return TransactionStates.SELECT_TO_ACCOUNT
 
+    # Выбор счета списания для обмена валюты
+    if data.startswith("exchange_from_"):
+        account = data.replace("exchange_from_", "")
+        trans.account = account
+
+        try:
+            sheets = get_sheets_service()
+            refs = sheets.get_references()
+            accounts = [a for a in refs["accounts"] if a != account]
+        except:
+            accounts = ["Наличные", "Карта", "Карта Сбер"]
+            accounts = [a for a in accounts if a != account]
+
+        await query.edit_message_text(
+            f"💱 **Обмен валюты**\n"
+            f"📤 С: {account}\n\n"
+            f"💳 На какой счет зачислить?",
+            parse_mode="Markdown",
+            reply_markup=get_accounts_keyboard(accounts, "exchange_to")
+        )
+        return TransactionStates.SELECT_TO_ACCOUNT
+
     return TransactionStates.SELECT_ACCOUNT
 
 
 async def select_to_account_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка выбора счета зачисления (для переводов)"""
+    """Обработка выбора счета зачисления (для переводов и обмена)"""
     query = update.callback_query
     await query.answer()
-    
+
     user_id = query.from_user.id
     data = query.data
     trans = get_user_transaction(user_id)
-    
+
     logger.info(f"select_to_account: {data}")
-    
+
     if data.startswith("to_"):
         to_account = data.replace("to_", "")
         trans.to_account = to_account
-        
+
         await query.edit_message_text(
             f"🔄 **Перевод**\n"
             f"📤 С: {trans.account}\n"
@@ -391,8 +454,147 @@ async def select_to_account_callback(update: Update, context: ContextTypes.DEFAU
             parse_mode="Markdown"
         )
         return TransactionStates.ENTER_AMOUNT
-    
+
+    # Для обмена валюты - после выбора счета спрашиваем валюту списания
+    if data.startswith("exchange_to_"):
+        to_account = data.replace("exchange_to_", "")
+        trans.to_account = to_account
+
+        await query.edit_message_text(
+            f"💱 **Обмен валюты**\n"
+            f"📤 С: {trans.account}\n"
+            f"📥 На: {to_account}\n\n"
+            f"🏦 Выбери валюту списания:",
+            parse_mode="Markdown",
+            reply_markup=get_currency_keyboard()
+        )
+        return TransactionStates.SELECT_CURRENCY
+
     return TransactionStates.SELECT_TO_ACCOUNT
+
+
+async def select_currency_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка выбора валюты для обмена и расхода"""
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+    data = query.data
+    trans = get_user_transaction(user_id)
+
+    logger.info(f"select_currency: {data}")
+
+    if data.startswith("currency_"):
+        currency = data.replace("currency_", "")
+        trans.currency = currency
+
+        # Для обмена валюты
+        if trans.trans_type == "Обмен валюты":
+            await query.edit_message_text(
+                f"💱 **Обмен валюты**\n"
+                f"📤 С: {trans.account}\n"
+                f"📥 На: {trans.to_account}\n"
+                f"🏦 Валюта: {currency}\n\n"
+                f"💵 Введи сумму списания ({currency}):",
+                parse_mode="Markdown"
+            )
+            return TransactionStates.ENTER_AMOUNT
+
+        # Для расхода
+        if trans.trans_type == "Расход":
+            day_str = f" (📅 {trans.day} число)" if trans.day else ""
+            await query.edit_message_text(
+                f"💸 **Расход**{day_str}\n"
+                f"📁 Категория: {trans.category}\n"
+                f"💳 Счёт: {trans.account}\n"
+                f"🏦 Валюта: {currency}\n\n"
+                f"💵 Введи сумму ({currency}):",
+                parse_mode="Markdown"
+            )
+            return TransactionStates.ENTER_AMOUNT
+
+    return TransactionStates.SELECT_CURRENCY
+
+
+async def enter_exchange_rate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка ввода курса обмена"""
+    user_id = update.effective_user.id
+    trans = get_user_transaction(user_id)
+
+    try:
+        rate_text = update.message.text.replace(",", ".").strip()
+        rate = float(rate_text)
+
+        if rate <= 0:
+            await update.message.reply_text("❌ Курс должен быть положительным!")
+            return TransactionStates.ENTER_EXCHANGE_RATE
+
+        trans.exchange_rate = rate
+
+        # Для РАСХОДА в валюте - рассчитываем эквивалент в BYN и переходим к комментарию
+        if trans.trans_type == "Расход":
+            amount_byn = trans.amount * rate
+            trans.amount_to = amount_byn  # Сохраняем эквивалент в BYN
+
+            await update.message.reply_text(
+                f"💸 **Расход в {trans.currency}**\n"
+                f"💵 Сумма: **{trans.amount}** {trans.currency}\n"
+                f"📊 Курс: {rate}\n"
+                f"💰 Эквивалент: **{amount_byn:.2f}** BYN\n\n"
+                "💬 Добавь комментарий (или /skip):",
+                parse_mode="Markdown"
+            )
+            return TransactionStates.ENTER_COMMENT
+
+        # Для ОБМЕНА валюты - спрашиваем сумму зачисления
+        to_currency = trans._get_to_currency()
+
+        await update.message.reply_text(
+            f"💱 **Обмен валюты**\n"
+            f"📤 С: {trans.account} ({trans.amount} {trans.currency})\n"
+            f"📥 На: {trans.to_account}\n"
+            f"📊 Курс: {rate}\n\n"
+            f"💵 Введи сумму зачисления ({to_currency}):",
+            parse_mode="Markdown"
+        )
+        return TransactionStates.ENTER_AMOUNT_TO
+
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Неверный формат курса!\nВведи число: `3.33` или `3,33`",
+            parse_mode="Markdown"
+        )
+        return TransactionStates.ENTER_EXCHANGE_RATE
+
+
+async def enter_amount_to(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка ввода суммы зачисления"""
+    user_id = update.effective_user.id
+    trans = get_user_transaction(user_id)
+
+    try:
+        amount_text = update.message.text.replace(",", ".").strip()
+        amount_to = float(amount_text)
+
+        if amount_to <= 0:
+            await update.message.reply_text("❌ Сумма должна быть положительной!")
+            return TransactionStates.ENTER_AMOUNT_TO
+
+        trans.amount_to = amount_to
+
+        await update.message.reply_text(
+            f"💵 Сумма зачисления: **{amount_to}** {trans._get_to_currency()}\n\n"
+            "💬 Добавь комментарий (или /skip):",
+            parse_mode="Markdown"
+        )
+        return TransactionStates.ENTER_COMMENT
+
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Неверный формат суммы!\nВведи число: `100` или `99.50`",
+            parse_mode="Markdown"
+        )
+        return TransactionStates.ENTER_AMOUNT_TO
 
 
 async def select_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -537,9 +739,30 @@ async def enter_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return TransactionStates.SELECT_CATEGORY
 
-        # Для расхода и перевода - к комментарию
+        # Для обмена валюты - спрашиваем курс
+        if trans.trans_type == "Обмен валюты":
+            await update.message.reply_text(
+                f"💱 **Обмен валюты**\n"
+                f"💵 Сумма списания: **{amount}** {trans.currency}\n\n"
+                f"📊 Введи курс обмена:",
+                parse_mode="Markdown"
+            )
+            return TransactionStates.ENTER_EXCHANGE_RATE
+
+        # Для расхода в иностранной валюте - спрашиваем курс
+        if trans.trans_type == "Расход" and trans.currency != "BYN":
+            await update.message.reply_text(
+                f"💸 **Расход в {trans.currency}**\n"
+                f"💵 Сумма: **{amount}** {trans.currency}\n\n"
+                f"📊 Введи текущий курс {trans.currency}/BYN:\n"
+                f"(для расчёта суммы в BYN)",
+                parse_mode="Markdown"
+            )
+            return TransactionStates.ENTER_EXCHANGE_RATE
+
+        # Для расхода в BYN и перевода - к комментарию
         await update.message.reply_text(
-            f"💵 Сумма: **{amount}** BYN\n\n"
+            f"💵 Сумма: **{amount}** {trans.currency}\n\n"
             "💬 Добавь комментарий (или /skip):",
             parse_mode="Markdown"
         )
@@ -668,9 +891,12 @@ async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 amount=trans.amount,
                 to_account=trans.to_account,
                 comment=trans.comment,
-                hours=trans.hours
+                hours=trans.hours,
+                exchange_rate=trans.exchange_rate,
+                amount_to=trans.amount_to,
+                currency=trans.currency
             )
-            
+
             if success:
                 response = format_transaction_success(
                     trans_type=trans.trans_type,
@@ -678,7 +904,11 @@ async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     category=trans.category,
                     comment=trans.comment,
                     hours=trans.hours,
-                    account=account
+                    account=account,
+                    currency=trans.currency,
+                    exchange_rate=trans.exchange_rate,
+                    amount_to=trans.amount_to,
+                    to_account=trans.to_account
                 )
                 await query.edit_message_text(
                     response,

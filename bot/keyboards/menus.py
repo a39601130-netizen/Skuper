@@ -53,7 +53,24 @@ def get_add_menu() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("💸 Расход", callback_data="add_expense")],
         [InlineKeyboardButton("💰 Доход", callback_data="add_income")],
         [InlineKeyboardButton("🔄 Перевод", callback_data="add_transfer")],
+        [InlineKeyboardButton("💱 Обмен валюты", callback_data="add_exchange")],
         [InlineKeyboardButton("◀️ Назад", callback_data="menu_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+# === ВЫБОР ВАЛЮТЫ ===
+def get_currency_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора валюты"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🇧🇾 BYN", callback_data="currency_BYN"),
+            InlineKeyboardButton("🇺🇸 USD", callback_data="currency_USD")
+        ],
+        [
+            InlineKeyboardButton("🇪🇺 EUR", callback_data="currency_EUR"),
+            InlineKeyboardButton("🇷🇺 RUB", callback_data="currency_RUB")
+        ]
     ]
     return InlineKeyboardMarkup(keyboard)
 

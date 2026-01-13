@@ -11,19 +11,27 @@ from utils.formatters import format_balance_message, format_stats_message, forma
 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /balance - показать балансы счетов"""
-    
+
     try:
         sheets = get_sheets_service()
         accounts = sheets.get_accounts_balance()
-        
+
+        # Получаем расходы по Сберу
+        sber_expenses = None
+        for acc in accounts:
+            if "сбер" in acc["name"].lower():
+                sber_expenses = sheets.get_account_expenses(acc["name"])
+                acc["sber_expenses"] = sber_expenses
+                break
+
         message = format_balance_message(accounts)
-        
+
         await update.message.reply_text(
             message,
             parse_mode="Markdown",
             reply_markup=get_main_menu()
         )
-        
+
     except Exception as e:
         await update.message.reply_text(
             f"❌ Ошибка загрузки балансов: {str(e)}\n\n"
@@ -40,6 +48,14 @@ async def balance_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         sheets = get_sheets_service()
         accounts = sheets.get_accounts_balance()
+
+        # Получаем расходы по Сберу
+        sber_expenses = None
+        for acc in accounts:
+            if "сбер" in acc["name"].lower():
+                sber_expenses = sheets.get_account_expenses(acc["name"])
+                acc["sber_expenses"] = sber_expenses
+                break
 
         message = format_balance_message(accounts)
 

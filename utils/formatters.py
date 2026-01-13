@@ -16,13 +16,13 @@ def format_money(amount: float, currency: str = "BYN") -> str:
 def format_balance_message(accounts: List[Dict[str, Any]]) -> str:
     """Форматировать сообщение с балансами"""
     lines = ["💳 **БАЛАНСЫ СЧЕТОВ**\n"]
-    
+
     total_byn = 0
-    
+
     for acc in accounts:
         current = acc["current"]
         currency = acc["currency"]
-        
+
         # Emoji для статуса
         if current > 0:
             emoji = "✅"
@@ -30,14 +30,37 @@ def format_balance_message(accounts: List[Dict[str, Any]]) -> str:
             emoji = "🔴"
         else:
             emoji = "⚪"
-        
+
         lines.append(f"{emoji} {acc['name']}: **{format_money(current, currency)}**")
-        
+
+        # Для Сбера показываем расходы и прогресс к 550 BYN
+        if "sber_expenses" in acc:
+            expenses = acc["sber_expenses"]
+            commission_limit = 550.0
+
+            remaining = commission_limit - expenses
+
+            if expenses >= commission_limit:
+                status = "✅"
+                status_text = "Без комиссии"
+            else:
+                status = "⚠️"
+                status_text = f"До безкомиссионного: {format_money(remaining)}"
+
+            # Прогресс-бар
+            progress = int((expenses / commission_limit) * 100)
+            filled = min(10, int(progress / 10))
+            empty = 10 - filled
+            bar = "█" * filled + "░" * empty
+
+            lines.append(f"   💸 Оплачено картой: {format_money(expenses)}/{format_money(commission_limit)}")
+            lines.append(f"   {status} [{bar}] {progress}% - {status_text}")
+
         if currency == "BYN":
             total_byn += current
-    
+
     lines.append(f"\n📊 **Всего (BYN):** {format_money(total_byn)}")
-    
+
     return "\n".join(lines)
 
 
@@ -124,16 +147,36 @@ def format_transaction_success(
     comment: Optional[str],
     hours: Optional[float] = None,
     account: Optional[str] = None,
-    show_balance: bool = True
+    show_balance: bool = True,
+    currency: str = "BYN",
+    exchange_rate: Optional[float] = None,
+    amount_to: Optional[float] = None,
+    to_account: Optional[str] = None
 ) -> str:
     """Форматировать сообщение об успешной транзакции"""
 
-    emoji = {"Доход": "💰", "Расход": "💸", "Перевод": "🔄"}.get(trans_type, "✅")
+    emoji = {"Доход": "💰", "Расход": "💸", "Перевод": "🔄", "Обмен валюты": "💱"}.get(trans_type, "✅")
 
     lines = [
         "✅ **Записано!**\n",
-        f"{emoji} {trans_type}: **{format_money(amount)}**"
+        f"{emoji} {trans_type}: **{format_money(amount, currency)}**"
     ]
+
+    # Для обмена валюты показываем детали
+    if trans_type == "Обмен валюты" and amount_to and exchange_rate:
+        # Определяем валюту зачисления по счёту
+        to_currency = "USD" if to_account and "USD" in to_account.upper() else "BYN"
+        if to_account and "EUR" in to_account.upper():
+            to_currency = "EUR"
+        if to_account and "RUB" in to_account.upper():
+            to_currency = "RUB"
+        lines.append(f"💵 Получено: **{format_money(amount_to, to_currency)}**")
+        lines.append(f"📊 Курс: {exchange_rate:.4f}")
+
+    # Для расхода в иностранной валюте показываем эквивалент
+    if trans_type == "Расход" and currency != "BYN" and exchange_rate and amount_to:
+        lines.append(f"📊 Курс: {exchange_rate:.4f}")
+        lines.append(f"💰 Эквивалент: **{format_money(amount_to, 'BYN')}**")
 
     if category:
         lines.append(f"📁 Категория: {category}")
@@ -369,11 +412,20 @@ def format_history(transactions: List[Dict[str, Any]]) -> str:
     lines = ["📜 **ПОСЛЕДНИЕ ТРАНЗАКЦИИ**\n"]
 
     for t in transactions:
-        emoji = {"Доход": "💰", "Расход": "💸", "Перевод": "🔄"}.get(t["type"], "📝")
+        emoji = {"Доход": "💰", "Расход": "💸", "Перевод": "🔄", "Обмен валюты": "💱"}.get(t["type"], "📝")
 
         # Используем full_date если есть, иначе только день
         date_str = t.get("full_date") or t['day']
-        line = f"{emoji} {date_str}: {t['amount']} BYN"
+        currency = t.get("currency", "BYN") or "BYN"
+        line = f"{emoji} {date_str}: {t['amount']} {currency}"
+
+        # Для обмена валюты показываем курс и сумму зачисления
+        if t["type"] == "Обмен валюты" and t.get("amount_to") and t.get("exchange_rate"):
+            line += f" → {t['amount_to']} (курс {t['exchange_rate']})"
+
+        # Для расхода в валюте показываем эквивалент
+        if t["type"] == "Расход" and currency != "BYN" and t.get("amount_to") and t.get("exchange_rate"):
+            line += f" = {t['amount_to']} BYN (курс {t['exchange_rate']})"
 
         if t.get("category"):
             line += f" ({t['category']})"

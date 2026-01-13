@@ -123,7 +123,38 @@ class GoogleSheetsService:
             "accounts": accounts,
             "categories": categories
         }
-    
+
+    @retry_on_error(max_retries=3, delay=1.0)
+    def ensure_exchange_type_exists(self) -> bool:
+        """Добавить тип 'Обмен валюты' в справочник если его нет"""
+        try:
+            self._ensure_connection()
+            refs = self.get_references()
+
+            if "Обмен валюты" in refs["types"]:
+                return True  # Уже есть
+
+            # Находим первую пустую ячейку в колонке A после заголовков
+            sheet = self.spreadsheet.worksheet(config.SHEET_REFERENCES)
+            data = sheet.get_all_values()
+
+            # Ищем первую пустую строку в колонке типов (A)
+            row_to_insert = 4  # Начинаем с 4-й строки
+            for i, row in enumerate(data[3:], start=4):
+                if not row[0] or not row[0].strip():
+                    row_to_insert = i
+                    break
+                row_to_insert = i + 1
+
+            # Добавляем тип
+            sheet.update_cell(row_to_insert, 1, "Обмен валюты")
+            logger.info(f"Добавлен тип 'Обмен валюты' в справочник (строка {row_to_insert})")
+            return True
+
+        except Exception as e:
+            logger.error(f"Ошибка добавления типа в справочник: {e}")
+            return False
+
     @retry_on_error(max_retries=3, delay=1.0)
     def get_accounts_balance(self) -> List[Dict[str, Any]]:
         """Получить балансы всех счетов"""
@@ -187,21 +218,27 @@ class GoogleSheetsService:
         amount: float,
         to_account: Optional[str] = None,
         comment: Optional[str] = None,
-        hours: Optional[float] = None
+        hours: Optional[float] = None,
+        exchange_rate: Optional[float] = None,
+        amount_to: Optional[float] = None,
+        currency: str = "BYN"
     ) -> bool:
         """
         Добавить транзакцию в таблицу
-        
+
         Args:
             day: День месяца (1-31)
-            trans_type: Тип (Доход, Расход, Перевод)
+            trans_type: Тип (Доход, Расход, Перевод, Обмен валюты)
             account: Счёт списания
             category: Категория (для Доходов и Расходов)
-            amount: Сумма
-            to_account: Счёт зачисления (для Переводов)
+            amount: Сумма списания
+            to_account: Счёт зачисления (для Переводов и Обмена)
             comment: Комментарий
             hours: Количество часов (для расчета зарплаты)
-        
+            exchange_rate: Курс обмена (для валютных операций)
+            amount_to: Сумма зачисления (для обмена валюты)
+            currency: Валюта операции (BYN, USD, EUR, RUB)
+
         Returns:
             bool: Успех операции
         """
@@ -210,8 +247,9 @@ class GoogleSheetsService:
             sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
 
             # Формируем строку данных
-            # A: Дата, B: Тип, C: Счёт, D: Категория, E: Сумма, 
-            # F: Счёт Куда, G: Комментарий, H: (формула), I: Часы
+            # A: Дата, B: Тип, C: Счёт, D: Категория, E: Сумма,
+            # F: Счёт Куда, G: Комментарий, H: (формула), I: Часы, J: Часы×6.5
+            # K: Курс, L: Сумма зачисления, M: Валюта
             row_data = [
                 day,                           # A: Дата (день)
                 trans_type,                    # B: Тип
@@ -222,14 +260,17 @@ class GoogleSheetsService:
                 comment or "",                 # G: Комментарий
                 "",                            # H: Полная дата (формула в таблице)
                 hours if hours else "",        # I: Часы
-                ""                             # J: Часы×6.5 (формула)
+                "",                            # J: Часы×6.5 (формула)
+                exchange_rate if exchange_rate else "",  # K: Курс
+                amount_to if amount_to else "",          # L: Сумма зачисления
+                currency                                  # M: Валюта
             ]
-            
+
             # Добавляем в конец таблицы
             sheet.append_row(row_data, value_input_option='USER_ENTERED')
-            
+
             return True
-            
+
         except Exception as e:
             print(f"Ошибка записи в Google Sheets: {e}")
             return False
@@ -287,7 +328,10 @@ class GoogleSheetsService:
                     "to_account": row[5],
                     "comment": row[6],
                     "full_date": row[7] if len(row) > 7 else "",
-                    "hours": row[8] if len(row) > 8 else ""
+                    "hours": row[8] if len(row) > 8 else "",
+                    "exchange_rate": row[10] if len(row) > 10 else "",
+                    "amount_to": row[11] if len(row) > 11 else "",
+                    "currency": row[12] if len(row) > 12 else "BYN"
                 })
 
         return transactions[-limit:][::-1]  # Последние N, в обратном порядке
@@ -367,6 +411,35 @@ class GoogleSheetsService:
             "total_tips": sum(d["tips"] for d in income_by_day.values()),
             "total_hours": sum(d["hours"] for d in income_by_day.values())
         }
+
+    @retry_on_error(max_retries=3, delay=1.0)
+    def get_account_expenses(self, account_name: str) -> float:
+        """
+        Получить сумму расходов по счету за текущий месяц
+
+        Args:
+            account_name: Название счета
+
+        Returns:
+            float: Сумма расходов
+        """
+        self._ensure_connection()
+        sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
+        data = sheet.get_all_values()
+
+        total_expenses = 0.0
+
+        for row in data[3:]:  # Пропускаем настройки и заголовки
+            if row[0] and row[0].strip() and len(row) > 4:
+                trans_type = row[1]  # Тип транзакции
+                account = row[2].strip()  # Счёт
+                amount = safe_float(row[4])  # Сумма
+
+                # Считаем только расходы с указанного счета
+                if trans_type == "Расход" and account == account_name:
+                    total_expenses += amount
+
+        return total_expenses
 
     @retry_on_error(max_retries=3, delay=1.0)
     def get_weekly_summary(self, days_back: int = 7) -> Dict[str, Any]:
