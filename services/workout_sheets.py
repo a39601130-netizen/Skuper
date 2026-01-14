@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class WorkoutSheetsService(BaseSheetsService):
     """Сервис для работы с таблицей тренировок"""
-    
+
     def __init__(self):
         super().__init__(config.GOOGLE_SHEETS_WORKOUT_ID)
         self._exercises_cache = None
@@ -22,6 +22,10 @@ class WorkoutSheetsService(BaseSheetsService):
         self._weights_cache_time = 0
         self._sets_cache = None
         self._sets_cache_time = 0
+        # Кэш истории тренировок
+        self._workouts_cache = None
+        self._workouts_cache_time = 0
+        self._workouts_cache_ttl = 60  # 60 секунд
     
     # ============================================
     # УПРАЖНЕНИЯ
@@ -212,7 +216,10 @@ class WorkoutSheetsService(BaseSheetsService):
         
         self.append_row(config.SHEET_WORKOUTS, row)
         logger.info(f"Created workout #{workout_id} - Day {day_type}")
-        
+
+        # Инвалидируем кэш
+        self._workouts_cache = None
+
         return workout_id
     
     def complete_workout(
@@ -242,20 +249,28 @@ class WorkoutSheetsService(BaseSheetsService):
         self.batch_update(config.SHEET_WORKOUTS, updates)
         logger.info(f"Completed workout #{workout_id}")
     
+    def _get_workouts_cached(self) -> List[Dict]:
+        """Получить все тренировки с кэшированием"""
+        import time
+        if self._workouts_cache is None or (time.time() - self._workouts_cache_time) > self._workouts_cache_ttl:
+            self._workouts_cache = self.get_all_records(config.SHEET_WORKOUTS)
+            self._workouts_cache_time = time.time()
+        return self._workouts_cache
+
     def get_last_workout(self) -> Optional[Dict]:
         """Получить последнюю тренировку"""
-        records = self.get_all_records(config.SHEET_WORKOUTS)
+        records = self._get_workouts_cached()
         return records[-1] if records else None
-    
+
     def get_workout_history(self, limit: int = 5) -> List[Dict]:
         """Получить историю тренировок"""
-        records = self.get_all_records(config.SHEET_WORKOUTS)
+        records = self._get_workouts_cached()
         return records[-limit:] if records else []
 
     def delete_last_workout(self) -> bool:
         """Удалить последнюю тренировку"""
         try:
-            records = self.get_all_records(config.SHEET_WORKOUTS)
+            records = self._get_workouts_cached()
             if not records:
                 return False
 
@@ -263,6 +278,9 @@ class WorkoutSheetsService(BaseSheetsService):
             last_row = len(records) + 1
             self.delete_row(config.SHEET_WORKOUTS, last_row)
             logger.info(f"Deleted last workout (row {last_row})")
+
+            # Инвалидируем кэш
+            self._workouts_cache = None
             return True
         except Exception as e:
             logger.error(f"Failed to delete last workout: {e}")
@@ -470,6 +488,8 @@ class WorkoutSheetsService(BaseSheetsService):
         """Сбросить кэш (вызывать после изменений)"""
         self._exercises_cache = None
         self._current_weights_cache = None
+        self._workouts_cache = None
+        self._sets_cache = None
 
 
 # Синглтон
