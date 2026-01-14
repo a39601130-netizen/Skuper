@@ -22,28 +22,8 @@ def get_date_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-# === ГЛАВНОЕ МЕНЮ ===
-def get_main_menu() -> InlineKeyboardMarkup:
-    """Главное меню бота"""
-    keyboard = [
-        [
-            InlineKeyboardButton("➕ Добавить", callback_data="menu_add"),
-            InlineKeyboardButton("💳 Балансы", callback_data="menu_balance")
-        ],
-        [
-            InlineKeyboardButton("📊 Статистика", callback_data="menu_stats"),
-            InlineKeyboardButton("💰 Доходы", callback_data="menu_income")
-        ],
-        [
-            InlineKeyboardButton("📈 Отчет за неделю", callback_data="menu_weekly_report"),
-            InlineKeyboardButton("📜 История", callback_data="menu_history")
-        ],
-        [
-            InlineKeyboardButton("🤖 AI Советник", callback_data="menu_advisor"),
-            InlineKeyboardButton("⚙️ Настройки", callback_data="menu_settings")
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
+# === ГЛАВНОЕ МЕНЮ (импортируется из main_menu.py) ===
+from bot.keyboards.main_menu import get_main_menu
 
 
 # === МЕНЮ ДОБАВЛЕНИЯ ТРАНЗАКЦИИ ===
@@ -70,7 +50,8 @@ def get_currency_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("🇪🇺 EUR", callback_data="currency_EUR"),
             InlineKeyboardButton("🇷🇺 RUB", callback_data="currency_RUB")
-        ]
+        ],
+        [InlineKeyboardButton("◀️ Назад", callback_data="menu_add")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -94,7 +75,8 @@ def get_accounts_keyboard(accounts: list, prefix: str = "acc") -> InlineKeyboard
     if row:  # Остаток
         keyboard.append(row)
 
-    # Кнопка "Назад" убрана - используйте /cancel для отмены
+    # Кнопка "Назад" для возврата к меню добавления транзакции
+    keyboard.append([InlineKeyboardButton("◀️ Назад", callback_data="menu_add")])
     return InlineKeyboardMarkup(keyboard)
 
 
@@ -143,7 +125,8 @@ def get_categories_keyboard(categories: list, trans_type: str) -> InlineKeyboard
     if row:
         keyboard.append(row)
 
-    # Кнопка "Назад" убрана - используйте /cancel для отмены
+    # Кнопка "Назад" для возврата к быстрым категориям
+    keyboard.append([InlineKeyboardButton("◀️ Назад", callback_data="menu_add")])
     return InlineKeyboardMarkup(keyboard)
 
 
@@ -163,7 +146,8 @@ def get_quick_expense_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("🎮 Досуг", callback_data="quick_Досуг"),
             InlineKeyboardButton("🛍️ Покупки", callback_data="quick_Покупки")
         ],
-        [InlineKeyboardButton("📋 Все категории", callback_data="show_all_categories")]
+        [InlineKeyboardButton("📋 Все категории", callback_data="show_all_categories")],
+        [InlineKeyboardButton("◀️ Назад", callback_data="menu_add")]
     ]
     return InlineKeyboardMarkup(keyboard)
 

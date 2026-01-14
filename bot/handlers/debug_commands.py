@@ -22,21 +22,24 @@ async def bugs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    response = f"🐛 **Нерешенные баги: {len(unresolved)}**\n\n"
+    response = f"🐛 Нерешенные баги: {len(unresolved)}\n\n"
 
     # Показываем последние 5 багов
     for i, bug in enumerate(unresolved[-5:], 1):
-        response += f"**{i}. {bug['error_type']}**\n"
-        response += f"📅 {bug['timestamp'][:19]}\n"
-        response += f"🔧 Обработчик: `{bug.get('handler', 'N/A')}`\n"
-        response += f"👤 User ID: {bug.get('user_id', 'N/A')}\n"
-        response += f"💬 {bug['error_message'][:100]}\n\n"
+        handler = str(bug.get('handler', 'N/A'))
+        error_msg = str(bug.get('error_message', 'N/A'))[:100]
 
-    response += f"\n📂 Полные логи в: `logs/bugs.json`"
+        response += f"{i}. {bug['error_type']}\n"
+        response += f"📅 {bug['timestamp'][:19]}\n"
+        response += f"🔧 Обработчик: {handler}\n"
+        response += f"👤 User ID: {bug.get('user_id', 'N/A')}\n"
+        response += f"💬 {error_msg}\n\n"
+
+    response += f"\n📂 Полные логи в: logs/bugs.json"
 
     await update.message.reply_text(
         response,
-        parse_mode="Markdown",
+        parse_mode=None,
         reply_markup=get_main_menu()
     )
 

@@ -1,6 +1,6 @@
 """
-Budget Bot - Главный файл
-Telegram бот для управления личными финансами
+Life Manager Bot - Главный файл
+Telegram бот для управления финансами и тренировками
 
 Запуск: python main.py
 """
@@ -18,7 +18,22 @@ from telegram.error import BadRequest, NetworkError, TimedOut
 
 import config
 from utils.debug_logger import setup_debug_logging, bug_tracker, log_conversation_state
+
+# States
+from bot.states import TransactionStates, AdvisorStates, WorkoutStates
+
+# Keyboards
+from bot.keyboards.main_menu import (
+    get_main_menu,
+    get_finance_menu,
+    get_workout_menu,
+    get_advisor_menu
+)
+
+# Handlers - Start
 from bot.handlers.start import start_command, help_command
+
+# Handlers - Finance (transactions)
 from bot.handlers.transactions import (
     add_command,
     menu_add_callback,
@@ -38,6 +53,8 @@ from bot.handlers.transactions import (
     confirm_callback,
     cancel
 )
+
+# Handlers - Finance (balance/stats)
 from bot.handlers.balance import (
     balance_command,
     balance_callback,
@@ -49,6 +66,8 @@ from bot.handlers.balance import (
     income_stats_callback,
     delete_transaction_callback
 )
+
+# Handlers - AI Advisor
 from bot.handlers.advisor import (
     advisor_command,
     advisor_callback,
@@ -57,14 +76,54 @@ from bot.handlers.advisor import (
     advisor_ask_callback,
     advisor_refresh_callback
 )
+
+# Handlers - Reports
 from bot.handlers.reports import (
     weekly_report_command,
     weekly_report_callback,
     send_weekly_report
 )
+
+# Handlers - Debug
 from bot.handlers.debug_commands import bugs_command, clear_bugs_command
-from bot.states import TransactionStates, AdvisorStates
-from bot.keyboards.menus import get_main_menu
+
+# Handlers - Workout
+from bot.handlers.workout.session import (
+    workout_menu_callback,
+    workout_start_callback,
+    workout_begin_callback,
+    energy_before_callback,
+    low_energy_decision_callback,
+    sleep_hours_input,
+    sleep_quality_callback,
+    back_pain_callback,
+    day_select_callback,
+    emotional_wave_callback,
+    energy_after_callback,
+    workout_cancel_callback
+)
+from bot.handlers.workout.exercises import (
+    warmup_done_callback,
+    warmup_skip_callback,
+    warmup_complete_callback,
+    set_input_handler,
+    rpe_callback,
+    timer_skip_callback,
+    timer_add_callback,
+    exercise_next_callback,
+    exercise_skip_callback,
+    workout_end_early_callback
+)
+from bot.handlers.workout.progress import (
+    workout_progress_callback,
+    workout_weights_callback,
+    workout_history_callback,
+    workout_next_callback,
+    workout_ai_analysis_callback,
+    workout_show_progress_callback,
+    workout_delete_last_callback,
+    workout_delete_confirm_callback
+)
 
 # Настройка логирования
 logging.basicConfig(
@@ -74,11 +133,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# ============================================
+# ОБРАБОТЧИКИ МЕНЮ
+# ============================================
+
 async def menu_callback(update: Update, context):
-    """Обработчик главного меню"""
+    """Обработчик главного меню и модулей"""
     query = update.callback_query
 
-    # Обрабатываем устаревшие callback запросы
     try:
         await query.answer()
     except BadRequest as e:
@@ -89,17 +151,61 @@ async def menu_callback(update: Update, context):
 
     data = query.data
 
-    # menu_add обрабатывается в ConversationHandler
-    if data == "menu_add":
+    # menu_add и finance_add обрабатываются в ConversationHandler
+    if data in ["menu_add", "finance_add"]:
         return
 
     try:
+        # === ГЛАВНОЕ МЕНЮ ===
         if data == "menu_main":
             await query.edit_message_text(
-                "🏠 **Главное меню**\n\nВыбери действие:",
+                "🏠 **Главное меню**\n\nВыбери модуль:",
                 parse_mode="Markdown",
                 reply_markup=get_main_menu()
             )
+
+        # === МОДУЛЬ ФИНАНСЫ ===
+        elif data == "module_finance":
+            await query.edit_message_text(
+                "💰 **ФИНАНСЫ**\n\nВыбери действие:",
+                parse_mode="Markdown",
+                reply_markup=get_finance_menu()
+            )
+        elif data == "finance_balance":
+            await balance_callback(update, context)
+        elif data == "finance_stats":
+            await stats_callback(update, context)
+        elif data == "finance_history":
+            await history_callback(update, context)
+
+        # === МОДУЛЬ ТРЕНИРОВКИ ===
+        elif data == "module_workout":
+            await workout_menu_callback(update, context)
+
+        # === МОДУЛЬ AI СОВЕТНИК ===
+        elif data == "module_advisor":
+            await query.edit_message_text(
+                "🤖 **AI СОВЕТНИК**\n\n"
+                "Выбери что проанализировать:",
+                parse_mode="Markdown",
+                reply_markup=get_advisor_menu()
+            )
+        elif data == "advisor_finance":
+            await advisor_callback(update, context)
+        elif data == "advisor_workout":
+            await workout_ai_analysis_callback(update, context)
+
+        # === МОДУЛЬ НАСТРОЙКИ ===
+        elif data == "module_settings":
+            await query.edit_message_text(
+                "⚙️ **НАСТРОЙКИ**\n\n"
+                "В разработке...\n\n"
+                "Настройки можно изменить в Google Sheets.",
+                parse_mode="Markdown",
+                reply_markup=get_main_menu()
+            )
+
+        # === СТАРЫЕ MENU_ ПУТИ (совместимость) ===
         elif data == "menu_balance":
             await balance_callback(update, context)
         elif data == "menu_stats":
@@ -114,16 +220,14 @@ async def menu_callback(update: Update, context):
             await history_callback(update, context)
         elif data == "menu_settings":
             await query.edit_message_text(
-                "⚙️ **Настройки**\n\n"
-                "В разработке...\n\n"
-                "Пока что настройки можно изменить в Google Sheets.",
+                "⚙️ **Настройки**\n\nВ разработке...",
                 parse_mode="Markdown",
                 reply_markup=get_main_menu()
             )
+
     except BadRequest as e:
-        # Игнорируем ошибку "message is not modified"
         if "message is not modified" not in str(e).lower():
-            raise  # Если это другая ошибка, пробрасываем дальше
+            raise
 
 
 async def handle_text(update: Update, context):
@@ -132,13 +236,16 @@ async def handle_text(update: Update, context):
         return
 
     text = update.message.text.lower()
-    
-    # Проверяем, есть ли активный диалог (ConversationHandler)
-    # Если да - не обрабатываем кнопки клавиатуры
+
+    # Проверяем, есть ли активный диалог
     user_data = context.user_data
     if user_data.get('in_conversation'):
-        return  # Пропускаем, ConversationHandler обработает
-    
+        return
+
+    # Проверяем, идёт ли тренировка
+    if user_data.get('workout'):
+        return
+
     # Проверяем на reply клавиатуру
     if text in ["➕ расход", "расход"]:
         from bot.keyboards.menus import get_quick_expense_keyboard
@@ -148,7 +255,7 @@ async def handle_text(update: Update, context):
             reply_markup=get_quick_expense_keyboard()
         )
         return
-        
+
     elif text in ["💰 доход", "доход"]:
         await update.message.reply_text(
             "💰 **Доход**\n\n"
@@ -157,19 +264,19 @@ async def handle_text(update: Update, context):
             parse_mode="Markdown"
         )
         return
-        
+
     elif text in ["💳 баланс", "баланс"]:
         await balance_command(update, context)
         return
-        
+
     elif text in ["📊 статистика", "статистика"]:
         await stats_command(update, context)
         return
-        
+
     elif text in ["🤖 советник", "советник"]:
         await advisor_command(update, context)
         return
-    
+
     # Иначе пробуем парсить как быстрый ввод
     await handle_quick_input(update, context)
 
@@ -177,14 +284,12 @@ async def handle_text(update: Update, context):
 async def error_handler(update: object, context):
     """Глобальный обработчик ошибок"""
     try:
-        # Получаем информацию об ошибке
         error = context.error
         user_id = None
 
         if update and hasattr(update, 'effective_user'):
             user_id = update.effective_user.id
 
-        # Логируем в наш трекер багов
         bug_tracker.log_bug(
             error=error,
             context={
@@ -196,17 +301,14 @@ async def error_handler(update: object, context):
             handler='global_error_handler'
         )
 
-        # Игнорируем сетевые ошибки
         if isinstance(error, (NetworkError, TimedOut)):
             logger.warning(f"Сетевая ошибка: {error}")
             return
 
-        # Уведомляем пользователя
         if update and hasattr(update, 'effective_message'):
             try:
                 await update.effective_message.reply_text(
-                    "❌ Произошла ошибка. Попробуй /start для перезапуска.\n"
-                    f"Ошибка записана в лог (ID пользователя: {user_id})",
+                    "❌ Произошла ошибка. Попробуй /start для перезапуска.",
                     reply_markup=get_main_menu()
                 )
             except:
@@ -216,18 +318,20 @@ async def error_handler(update: object, context):
         logger.error(f"Ошибка в error_handler: {e}")
 
 
+# ============================================
+# ГЛАВНАЯ ФУНКЦИЯ
+# ============================================
+
 def main():
     """Запуск бота"""
 
-    # Настраиваем систему отладки
     setup_debug_logging()
 
-    # Проверяем наличие токена
     if not config.TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN не задан в .env файле!")
         return
 
-    # Инициализируем Google Sheets и добавляем тип "Обмен валюты" если его нет
+    # Инициализируем Google Sheets для финансов
     try:
         from services.sheets import get_sheets_service
         sheets = get_sheets_service()
@@ -237,10 +341,10 @@ def main():
 
     # Создаем приложение
     application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
-    
-    # === HANDLERS ===
-    
-    # Команды
+
+    # ============================================
+    # КОМАНДЫ
+    # ============================================
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("balance", balance_command))
@@ -249,16 +353,18 @@ def main():
     application.add_handler(CommandHandler("history", history_command))
     application.add_handler(CommandHandler("advisor", advisor_command))
     application.add_handler(CommandHandler("weekly", weekly_report_command))
-    
+
     # Команды отладки
     application.add_handler(CommandHandler("bugs", bugs_command))
     application.add_handler(CommandHandler("clear_bugs", clear_bugs_command))
-    
-    # ConversationHandler для добавления транзакции
+
+    # ============================================
+    # CONVERSATION HANDLER - ФИНАНСЫ
+    # ============================================
     add_conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("add", add_command),
-            CallbackQueryHandler(menu_add_callback, pattern="^menu_add$"),
+            CallbackQueryHandler(menu_add_callback, pattern="^(menu_add|finance_add)$"),
             CallbackQueryHandler(select_category_callback, pattern="^(quick_|show_all)")
         ],
         states={
@@ -267,7 +373,7 @@ def main():
             ],
             TransactionStates.SELECT_DATE: [
                 CallbackQueryHandler(select_date_callback, pattern="^date_"),
-                CallbackQueryHandler(menu_add_callback, pattern="^menu_add$"),
+                CallbackQueryHandler(menu_add_callback, pattern="^(menu_add|finance_add)$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_custom_date)
             ],
             TransactionStates.SELECT_ACCOUNT: [
@@ -305,18 +411,19 @@ def main():
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
-            CallbackQueryHandler(menu_add_callback, pattern="^menu_add$"),
-            CallbackQueryHandler(menu_callback, pattern="^menu_(main|balance|stats|income|weekly_report|advisor|history|settings)$")
+            CallbackQueryHandler(menu_add_callback, pattern="^(menu_add|finance_add)$"),
+            CallbackQueryHandler(menu_callback, pattern="^(menu_|module_)")
         ],
         per_message=False,
         per_user=True,
         per_chat=True,
         conversation_timeout=300
     )
-    # Группа 0 - высший приоритет
     application.add_handler(add_conv_handler, group=0)
-    
-    # ConversationHandler для AI советника
+
+    # ============================================
+    # CONVERSATION HANDLER - AI СОВЕТНИК
+    # ============================================
     advisor_conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("ask", ask_advisor_command),
@@ -332,54 +439,161 @@ def main():
         per_chat=True
     )
     application.add_handler(advisor_conv_handler, group=0)
-    
-    # Callback для кнопок AI советника
-    application.add_handler(CallbackQueryHandler(advisor_refresh_callback, pattern="^advisor_refresh$"))
 
-    # Callback для кнопок удаления транзакций
+    # ============================================
+    # CONVERSATION HANDLER - ТРЕНИРОВКИ
+    # ============================================
+    workout_conv_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(workout_start_callback, pattern="^workout_start$"),
+        ],
+        states={
+            WorkoutStates.ENERGY_BEFORE: [
+                CallbackQueryHandler(workout_begin_callback, pattern="^workout_begin$"),
+                CallbackQueryHandler(energy_before_callback, pattern="^energy_"),
+                CallbackQueryHandler(low_energy_decision_callback, pattern="^low_energy_"),
+            ],
+            WorkoutStates.SLEEP_HOURS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, sleep_hours_input),
+            ],
+            WorkoutStates.SLEEP_QUALITY: [
+                CallbackQueryHandler(sleep_quality_callback, pattern="^energy_"),
+            ],
+            WorkoutStates.BACK_PAIN: [
+                CallbackQueryHandler(back_pain_callback, pattern="^energy_"),
+            ],
+            WorkoutStates.EMOTIONAL_WAVE: [
+                CallbackQueryHandler(day_select_callback, pattern="^select_day_"),
+                CallbackQueryHandler(emotional_wave_callback, pattern="^wave_"),
+            ],
+            WorkoutStates.WARMUP_PHASE1: [
+                CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
+                CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
+            ],
+            WorkoutStates.WARMUP_PHASE2: [
+                CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
+                CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
+            ],
+            WorkoutStates.WARMUP_PHASE3: [
+                CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
+                CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
+            ],
+            WorkoutStates.WARMUP_PHASE4: [
+                CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
+                CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
+            ],
+            WorkoutStates.EXERCISE_START: [
+                CallbackQueryHandler(warmup_complete_callback, pattern="^warmup_complete$"),
+            ],
+            WorkoutStates.SET_INPUT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, set_input_handler),
+                CallbackQueryHandler(exercise_skip_callback, pattern="^exercise_skip$"),
+                CallbackQueryHandler(workout_end_early_callback, pattern="^workout_end_early$"),
+            ],
+            WorkoutStates.SET_RPE: [
+                CallbackQueryHandler(rpe_callback, pattern="^rpe_"),
+            ],
+            WorkoutStates.REST_TIMER: [
+                CallbackQueryHandler(timer_skip_callback, pattern="^timer_skip$"),
+                CallbackQueryHandler(timer_add_callback, pattern="^timer_add_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, set_input_handler),
+            ],
+            WorkoutStates.EXERCISE_COMPLETE: [
+                CallbackQueryHandler(exercise_next_callback, pattern="^exercise_next$"),
+                CallbackQueryHandler(workout_end_early_callback, pattern="^workout_end_early$"),
+            ],
+            WorkoutStates.ENERGY_AFTER: [
+                CallbackQueryHandler(energy_after_callback, pattern="^energy_"),
+            ],
+        },
+        fallbacks=[
+            CallbackQueryHandler(workout_cancel_callback, pattern="^workout_cancel$"),
+            CommandHandler("cancel", workout_cancel_callback),
+        ],
+        per_message=False,
+        per_user=True,
+        per_chat=True,
+        conversation_timeout=3600  # 1 час на тренировку
+    )
+    application.add_handler(workout_conv_handler, group=0)
+
+    # ============================================
+    # CALLBACK HANDLERS - ТРЕНИРОВКИ (вне conversation)
+    # ============================================
+    application.add_handler(CallbackQueryHandler(
+        workout_menu_callback, pattern="^module_workout$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        workout_progress_callback, pattern="^workout_progress$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        workout_weights_callback, pattern="^workout_weights$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        workout_history_callback, pattern="^workout_history$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        workout_next_callback, pattern="^workout_next$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        workout_ai_analysis_callback, pattern="^workout_ai_analysis$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        workout_show_progress_callback, pattern="^workout_show_progress$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        workout_delete_last_callback, pattern="^workout_delete_last$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        workout_delete_confirm_callback, pattern="^workout_delete_confirm$"
+    ))
+
+    # ============================================
+    # CALLBACK HANDLERS - ОБЩИЕ
+    # ============================================
+    application.add_handler(CallbackQueryHandler(advisor_refresh_callback, pattern="^advisor_refresh$"))
     application.add_handler(CallbackQueryHandler(delete_transaction_callback, pattern="^delete_"))
 
-    # Callback для меню
-    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu_"))
-    
-    # Обработчик текстовых сообщений (быстрый ввод) - группа 1 (ниже приоритет)
+    # Главное меню и модули
+    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^(menu_|module_|finance_|advisor_)"))
+
+    # Обработчик текстовых сообщений (быстрый ввод)
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text),
         group=1
     )
 
-
-    # Регистрируем глобальный обработчик ошибок
+    # Глобальный обработчик ошибок
     application.add_error_handler(error_handler)
 
-    # === ПЛАНИРОВЩИК ЗАДАЧ ===
-    # Настраиваем еженедельную отправку отчетов по воскресеньям
+    # ============================================
+    # ПЛАНИРОВЩИК ЗАДАЧ
+    # ============================================
     if config.TELEGRAM_USER_ID:
         try:
             from datetime import time
 
             user_id = int(config.TELEGRAM_USER_ID)
 
-            # Отправка каждое воскресенье в 20:00 (по времени сервера)
             job_queue = application.job_queue
             job_queue.run_daily(
                 send_weekly_report,
                 time=time(hour=20, minute=0),
-                days=(6,),  # 6 = воскресенье (0=понедельник, 6=воскресенье)
+                days=(6,),  # воскресенье
                 chat_id=user_id,
                 name="weekly_report"
             )
 
-            logger.info(f"✅ Настроена автоматическая отправка отчетов по воскресеньям в 20:00 для пользователя {user_id}")
+            logger.info(f"✅ Еженедельные отчеты настроены для пользователя {user_id}")
 
         except Exception as e:
-            logger.error(f"❌ Ошибка настройки автоматических отчетов: {e}")
+            logger.error(f"❌ Ошибка настройки отчетов: {e}")
     else:
         logger.warning("⚠️ TELEGRAM_USER_ID не задан - автоматические отчеты отключены")
 
-    # Запуск бота
-    logger.info("🤖 Budget Bot запущен с системой отладки!")
-    logger.info(f"📂 Логи сохраняются в: logs/debug.log и logs/bugs.json")
+    # Запуск
+    logger.info("🤖 Life Manager Bot запущен!")
+    logger.info("📊 Модули: Финансы + Тренировки + AI Советник")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 

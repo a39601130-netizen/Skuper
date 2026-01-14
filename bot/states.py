@@ -24,6 +24,35 @@ class AdvisorStates(IntEnum):
     WAITING_QUESTION = auto()  # Ожидание вопроса
 
 
+class WorkoutStates(IntEnum):
+    """Состояния для тренировки"""
+    # Начало тренировки
+    ENERGY_BEFORE = auto()      # Ввод энергии до
+    SLEEP_HOURS = auto()        # Часы сна
+    SLEEP_QUALITY = auto()      # Качество сна
+    BACK_PAIN = auto()          # Боль в спине
+    EMOTIONAL_WAVE = auto()     # Эмоциональная волна
+
+    # Разминка
+    WARMUP_PHASE1 = auto()      # Кардио
+    WARMUP_PHASE2 = auto()      # McGill Big 3
+    WARMUP_PHASE3 = auto()      # Подготовка к движению
+    WARMUP_PHASE4 = auto()      # Специфическая
+
+    # Основная часть
+    EXERCISE_START = auto()     # Показ упражнения
+    SET_INPUT = auto()          # Ввод веса и повторений
+    SET_RPE = auto()            # Ввод RPE
+    SET_NOTES = auto()          # Заметки к подходу
+    REST_TIMER = auto()         # Таймер отдыха
+    EXERCISE_COMPLETE = auto()  # Упражнение завершено
+
+    # Завершение
+    ENERGY_AFTER = auto()       # Энергия после
+    WORKOUT_NOTES = auto()      # Общие заметки
+    WORKOUT_COMPLETE = auto()   # Тренировка завершена
+
+
 class SettingsStates(IntEnum):
     """Состояния для настроек"""
     MAIN_SETTINGS = auto()

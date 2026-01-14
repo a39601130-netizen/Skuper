@@ -1,164 +1,275 @@
 """
-AI Советник на базе DeepSeek
+DeepSeek AI Советник
+Интеграция с DeepSeek API для анализа и рекомендаций
 """
+import logging
 import httpx
-from typing import Dict, Any, Optional
+from typing import Optional
 import config
 
+logger = logging.getLogger(__name__)
+
+
 class AIAdvisor:
-    """AI советник для финансовых рекомендаций"""
+    """Класс для работы с DeepSeek AI"""
     
     def __init__(self):
         self.api_key = config.DEEPSEEK_API_KEY
         self.api_url = config.DEEPSEEK_API_URL
-        self.user_name = config.USER_NAME
+        self.model = config.DEEPSEEK_MODEL
         self.hd_context = config.HUMAN_DESIGN_CONTEXT
     
-    async def get_advice(
-        self, 
-        budget_data: Dict[str, Any],
-        user_question: Optional[str] = None
+    async def ask(
+        self,
+        question: str,
+        context: Optional[str] = None,
+        mode: str = "default"
     ) -> str:
         """
-        Получить совет от AI на основе данных бюджета
+        Отправить вопрос к DeepSeek
         
         Args:
-            budget_data: Данные из get_monthly_summary()
-            user_question: Опциональный вопрос пользователя
+            question: Вопрос пользователя
+            context: Дополнительный контекст (данные тренировок, финансов)
+            mode: Режим ответа (default, brief, detailed)
         
         Returns:
-            str: Совет от AI
+            Ответ от AI
         """
+        if not self.api_key:
+            return "❌ API ключ DeepSeek не настроен"
         
-        # Формируем контекст с данными бюджета
-        budget_context = self._format_budget_context(budget_data)
+        # Формируем системный промпт
+        system_prompt = self._build_system_prompt(mode)
         
-        # Системный промпт
-        system_prompt = f"""Ты - персональный финансовый AI-советник для {self.user_name}.
-
-{self.hd_context}
-
-## ПРАВИЛА ОБЩЕНИЯ
-- Без осуждения, с фокусом на решения
-- При вопросах о больших покупках: проверяй "это ХОЧУ или ДОЛЖЕН?"
-- Учитывай эмоциональный авторитет: не торопи с решениями
-- Напоминай о Human Design профиле при важных выборах
-
-## КОНТЕКСТ МОТИВАЦИИ
-- Ценность {self.user_name} НЕ измеряется часами работы
-- Его талант: системное видение, объяснение сложного просто
-- Работа официантом — временный этап, не идентичность
-- Каждый сохранённый рубль = шаг к свободе и признанию
-
-## ФОРМАТ ОТВЕТА
-📊 [Краткий анализ ситуации]
-💡 [1-2 практических действия]
-🎯 [Связь с целью/мотивация]
-
-При необходимости добавь:
-⚠️ [Предупреждение для эмоционального авторитета]
-✨ [Признание достижения]
-
-## СТИЛЬ
-- Краткие сообщения (до 500 символов)
-- Конкретные цифры и действия
-- Используй эмодзи для структуры
-- Обращайся на "ты"
-
-ВАЖНО: Отвечай на русском языке!"""
-
-        # Пользовательский запрос
-        if user_question:
-            user_prompt = f"""Текущее состояние бюджета:
-{budget_context}
-
-Вопрос пользователя: {user_question}
-
-Дай персонализированный совет."""
-        else:
-            user_prompt = f"""Текущее состояние бюджета:
-{budget_context}
-
-Проанализируй ситуацию и дай краткий совет дня. 
-Если есть проблемы - укажи их. Если всё хорошо - похвали."""
-
+        # Формируем сообщение с контекстом
+        user_message = question
+        if context:
+            user_message = f"{context}\n\n---\nВопрос: {question}"
+        
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     self.api_url,
                     headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.api_key}"
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
                     },
                     json={
-                        "model": "deepseek-chat",
+                        "model": self.model,
                         "messages": [
                             {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
+                            {"role": "user", "content": user_message}
                         ],
-                        "max_tokens": 500,
-                        "temperature": 0.7
+                        "temperature": 0.7,
+                        "max_tokens": 1500 if mode == "detailed" else 800
                     }
                 )
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    return data["choices"][0]["message"]["content"]
-                else:
-                    return f"❌ Ошибка API: {response.status_code}"
-                    
+                response.raise_for_status()
+                data = response.json()
+                
+                return data["choices"][0]["message"]["content"]
+                
         except httpx.TimeoutException:
-            return "⏳ AI советник временно недоступен. Попробуй позже."
+            logger.error("DeepSeek API timeout")
+            return "⏱️ Превышено время ожидания. Попробуй позже."
+        except httpx.HTTPStatusError as e:
+            logger.error(f"DeepSeek API error: {e}")
+            return f"❌ Ошибка API: {e.response.status_code}"
         except Exception as e:
-            return f"❌ Ошибка: {str(e)}"
+            logger.error(f"DeepSeek unexpected error: {e}")
+            return "❌ Произошла ошибка при обращении к AI"
     
-    def _format_budget_context(self, data: Dict[str, Any]) -> str:
-        """Форматировать данные бюджета для AI"""
+    def _build_system_prompt(self, mode: str) -> str:
+        """Построить системный промпт в зависимости от режима"""
         
-        lines = [
-            f"📊 Доходы за месяц: {data['total_income']} BYN",
-            f"💸 Расходы за месяц: {data['total_expense']} BYN", 
-            f"📈 Баланс: {data['balance']} BYN",
-            ""
-        ]
+        base_prompt = f"""Ты - персональный AI-помощник для Артура.
+
+{self.hd_context}
+
+ТВОЯ РОЛЬ:
+- Анализировать данные тренировок и финансов
+- Давать персонализированные рекомендации
+- Учитывать Human Design при советах
+- Быть поддерживающим, но честным
+- Говорить на русском языке
+"""
         
-        # Счета
-        lines.append("💳 Счета:")
-        for acc in data.get("accounts", []):
-            lines.append(f"  • {acc['name']}: {acc['current']} {acc['currency']}")
+        if mode == "brief":
+            base_prompt += """
+ФОРМАТ ОТВЕТА:
+- Кратко и по делу (2-3 предложения)
+- Используй emoji для структуры
+- Без лишних объяснений
+"""
+        elif mode == "detailed":
+            base_prompt += """
+ФОРМАТ ОТВЕТА:
+- Подробный анализ с объяснениями
+- Структурируй информацию
+- Приводи конкретные цифры и рекомендации
+- Используй emoji для наглядности
+"""
+        else:  # default
+            base_prompt += """
+ФОРМАТ ОТВЕТА:
+- Сбалансированный по длине
+- Конкретные рекомендации
+- Используй emoji умеренно
+"""
         
-        # Категории расходов с бюджетами
-        lines.append("\n📁 Расходы по категориям:")
-        for cat in data.get("categories", []):
-            if cat["type"] == "Расход" and cat["budget"] > 0:
-                progress_pct = int(cat["progress"] * 100)
-                status = "⚠️" if progress_pct >= 80 else "✅"
-                lines.append(
-                    f"  {status} {cat['name']}: {cat['spent']}/{cat['budget']} BYN ({progress_pct}%)"
+        return base_prompt
+    
+    async def analyze_workout(
+        self,
+        workout_data: dict,
+        history: list,
+        trigger: str = "manual"
+    ) -> str:
+        """
+        Анализ тренировки
+        
+        Args:
+            workout_data: Данные текущей тренировки
+            history: История последних тренировок
+            trigger: Что вызвало анализ (manual, low_energy, high_rpe, etc.)
+        
+        Returns:
+            Анализ и рекомендации
+        """
+        context = self._format_workout_context(workout_data, history, trigger)
+        
+        prompts = {
+            "manual": "Проанализируй мою тренировку и дай рекомендации.",
+            "low_energy": "Моя энергия сегодня низкая. Что посоветуешь?",
+            "high_rpe": "Последние тренировки были очень тяжёлыми (RPE 9+). Это проблема?",
+            "back_pain": "Боль в спине выше обычного. Как адаптировать тренировку?",
+            "phase_transition": "Я перехожу в новую фазу программы. Что меняется?",
+            "weekly": "Подведи итоги недели тренировок.",
+        }
+        
+        question = prompts.get(trigger, prompts["manual"])
+        mode = "brief" if trigger in ["low_energy", "high_rpe", "back_pain"] else "default"
+        
+        return await self.ask(question, context, mode)
+    
+    async def analyze_finance(
+        self,
+        finance_data: dict,
+        period: str = "month"
+    ) -> str:
+        """
+        Анализ финансов
+        
+        Args:
+            finance_data: Данные по финансам
+            period: Период анализа (week, month, year)
+        """
+        context = self._format_finance_context(finance_data, period)
+        question = f"Проанализируй мои финансы за {period} и дай рекомендации."
+        
+        return await self.ask(question, context, "default")
+    
+    def _format_workout_context(
+        self,
+        workout_data: dict,
+        history: list,
+        trigger: str
+    ) -> str:
+        """Форматировать контекст тренировки для AI"""
+        
+        context_parts = ["📊 ДАННЫЕ ТРЕНИРОВКИ:"]
+        
+        if workout_data:
+            context_parts.append(f"""
+Текущая тренировка:
+- День: {workout_data.get('day_type', 'N/A')}
+- Неделя: {workout_data.get('week_num', 'N/A')}
+- Фаза: {workout_data.get('phase', 'N/A')}
+- Энергия до: {workout_data.get('energy_before', 'N/A')}/10
+- Сон: {workout_data.get('sleep_hours', 'N/A')} часов
+- Боль в спине: {workout_data.get('back_pain', 'N/A')}/10
+- Эмоциональная волна: {workout_data.get('emotional_wave', 'N/A')}
+""")
+        
+        if history:
+            context_parts.append("\nИстория последних тренировок:")
+            for i, h in enumerate(history[-5:], 1):
+                context_parts.append(
+                    f"{i}. {h.get('date', 'N/A')} - День {h.get('day_type', 'N/A')}, "
+                    f"энергия: {h.get('energy_before', '?')}→{h.get('energy_after', '?')}"
                 )
         
-        # Предупреждения
-        if data.get("over_budget"):
-            lines.append("\n🚨 ПРЕВЫШЕНИЕ БЮДЖЕТА:")
-            for cat in data["over_budget"]:
-                over = cat["spent"] - cat["budget"]
+        if trigger != "manual":
+            context_parts.append(f"\n⚠️ Триггер анализа: {trigger}")
+        
+        return "\n".join(context_parts)
+    
+    def _format_finance_context(self, finance_data: dict, period: str) -> str:
+        """Форматировать контекст финансов для AI"""
+        
+        return f"""📊 ФИНАНСОВЫЕ ДАННЫЕ ({period}):
+
+Доходы: {finance_data.get('income', 0)} BYN
+Расходы: {finance_data.get('expenses', 0)} BYN
+Баланс: {finance_data.get('balance', 0)} BYN
+
+Топ категории расходов:
+{finance_data.get('top_expenses', 'Нет данных')}
+
+Рабочие часы: {finance_data.get('work_hours', 0)} ч
+"""
+
+
+
+    async def get_advice(
+        self,
+        budget_data: dict,
+        user_question: str = None
+    ) -> str:
+        """Получить совет от AI на основе данных бюджета"""
+        context = self._format_budget_context(budget_data)
+        question = user_question or 'Проанализируй ситуацию и дай краткий совет дня.'
+        return await self.ask(question, context, 'default')
+
+    def _format_budget_context(self, data: dict) -> str:
+        """Форматировать данные бюджета для AI"""
+        lines = [
+            f"📊 Доходы за месяц: {data.get('total_income', 0)} BYN",
+            f"💸 Расходы за месяц: {data.get('total_expense', 0)} BYN",
+            f"📈 Баланс: {data.get('balance', 0)} BYN",
+            ''
+        ]
+        lines.append('💳 Счета:')
+        for acc in data.get('accounts', []):
+            lines.append(f"  • {acc['name']}: {acc['current']} {acc['currency']}")
+        lines.append('')
+        lines.append('📁 Расходы по категориям:')
+        for cat in data.get('categories', []):
+            if cat.get('type') == 'Расход' and cat.get('budget', 0) > 0:
+                progress_pct = int(cat.get('progress', 0) * 100)
+                status = '⚠️' if progress_pct >= 80 else '✅'
+                lines.append(f"  {status} {cat['name']}: {cat['spent']}/{cat['budget']} BYN ({progress_pct}%)")
+        if data.get('over_budget'):
+            lines.append('')
+            lines.append('🚨 ПРЕВЫШЕНИЕ БЮДЖЕТА:')
+            for cat in data['over_budget']:
+                over = cat['spent'] - cat['budget']
                 lines.append(f"  • {cat['name']}: +{over} BYN сверх лимита!")
-        
-        if data.get("near_limit"):
-            lines.append("\n⚠️ Близко к лимиту:")
-            for cat in data["near_limit"]:
-                remaining = cat["remaining"]
-                lines.append(f"  • {cat['name']}: осталось {remaining} BYN")
-        
-        return "\n".join(lines)
+        if data.get('near_limit'):
+            lines.append('')
+            lines.append('⚠️ Близко к лимиту:')
+            for cat in data['near_limit']:
+                lines.append(f"  • {cat['name']}: осталось {cat['remaining']} BYN")
+        return '\n'.join(lines)
 
-
-# Создаем глобальный экземпляр
-_advisor = None
+# Синглтон для использования
+_advisor_instance = None
 
 def get_advisor() -> AIAdvisor:
-    """Получить экземпляр советника (singleton)"""
-    global _advisor
-    if _advisor is None:
-        _advisor = AIAdvisor()
-    return _advisor
+    """Получить экземпляр AI советника"""
+    global _advisor_instance
+    if _advisor_instance is None:
+        _advisor_instance = AIAdvisor()
+    return _advisor_instance

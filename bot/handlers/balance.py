@@ -16,11 +16,11 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sheets = get_sheets_service()
         accounts = sheets.get_accounts_balance()
 
-        # Получаем расходы по Сберу
+        # Получаем расходы по Сберу (исключаем категорию "Долги")
         sber_expenses = None
         for acc in accounts:
             if "сбер" in acc["name"].lower():
-                sber_expenses = sheets.get_account_expenses(acc["name"])
+                sber_expenses = sheets.get_account_expenses(acc["name"], exclude_categories=["Долги"])
                 acc["sber_expenses"] = sber_expenses
                 break
 
@@ -49,11 +49,11 @@ async def balance_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sheets = get_sheets_service()
         accounts = sheets.get_accounts_balance()
 
-        # Получаем расходы по Сберу
+        # Получаем расходы по Сберу (исключаем категорию "Долги")
         sber_expenses = None
         for acc in accounts:
             if "сбер" in acc["name"].lower():
-                sber_expenses = sheets.get_account_expenses(acc["name"])
+                sber_expenses = sheets.get_account_expenses(acc["name"], exclude_categories=["Долги"])
                 acc["sber_expenses"] = sber_expenses
                 break
 

@@ -31,30 +31,12 @@ def format_balance_message(accounts: List[Dict[str, Any]]) -> str:
         else:
             emoji = "⚪"
 
-        lines.append(f"{emoji} {acc['name']}: **{format_money(current, currency)}**")
-
-        # Для Сбера показываем расходы и прогресс к 550 BYN
+        # Для Сбера показываем в одну строку: баланс / расходы
         if "sber_expenses" in acc:
             expenses = acc["sber_expenses"]
-            commission_limit = 550.0
-
-            remaining = commission_limit - expenses
-
-            if expenses >= commission_limit:
-                status = "✅"
-                status_text = "Без комиссии"
-            else:
-                status = "⚠️"
-                status_text = f"До безкомиссионного: {format_money(remaining)}"
-
-            # Прогресс-бар
-            progress = int((expenses / commission_limit) * 100)
-            filled = min(10, int(progress / 10))
-            empty = 10 - filled
-            bar = "█" * filled + "░" * empty
-
-            lines.append(f"   💸 Оплачено картой: {format_money(expenses)}/{format_money(commission_limit)}")
-            lines.append(f"   {status} [{bar}] {progress}% - {status_text}")
+            lines.append(f"{emoji} {acc['name']}: {format_money(current, currency)} / {format_money(expenses, currency)}")
+        else:
+            lines.append(f"{emoji} {acc['name']}: **{format_money(current, currency)}**")
 
         if currency == "BYN":
             total_byn += current
@@ -88,6 +70,15 @@ def format_stats_message(data: Dict[str, Any]) -> str:
     if expense_cats:
         lines.append("\n💸 **Расходы:**")
 
+        # Сортируем: "Аренда" первой, остальные по порядку
+        def sort_key(cat):
+            if cat['name'] == "Аренда":
+                return (0, cat['name'])
+            else:
+                return (1, cat['name'])
+
+        expense_cats = sorted(expense_cats, key=sort_key)
+
         # Маппинг эмодзи для категорий
         category_emoji = {
             "Продукты": "🛒",
@@ -109,33 +100,38 @@ def format_stats_message(data: Dict[str, Any]) -> str:
         }
 
         for cat in expense_cats:
-            if cat["budget"] > 0:  # Показываем только категории с бюджетом
-                # Рассчитываем прогресс правильно
-                spent = cat["spent"]
-                budget = cat["budget"]
-                progress = int((spent / budget) * 100) if budget > 0 else 0
+            spent = cat["spent"]
+            budget = cat["budget"]
 
-                # Создаем шкалу прогресса
-                filled = int(progress / 10)  # Сколько заполненных блоков (0-10)
-                if filled > 10:
-                    filled = 10
-                empty = 10 - filled
-                bar = "█" * filled + "░" * empty
-
-                # Выбираем эмодзи и статус
+            # Показываем категории с расходами ИЛИ с бюджетом
+            if spent > 0 or budget > 0:
                 emoji = category_emoji.get(cat['name'], "📁")
 
-                if progress >= 100:
-                    status = "🔴"
-                elif progress >= 80:
-                    status = "🟡"
-                else:
-                    status = "🟢"
+                if budget > 0:
+                    # Есть бюджет - показываем прогресс
+                    progress = int((spent / budget) * 100) if budget > 0 else 0
 
-                lines.append(
-                    f"{emoji} {cat['name']}: {format_money(spent)}/{format_money(budget)}"
-                )
-                lines.append(f"   {status} [{bar}] {progress}%")
+                    # Создаем шкалу прогресса
+                    filled = int(progress / 10)
+                    if filled > 10:
+                        filled = 10
+                    empty = 10 - filled
+                    bar = "█" * filled + "░" * empty
+
+                    if progress >= 100:
+                        status = "🔴"
+                    elif progress >= 80:
+                        status = "🟡"
+                    else:
+                        status = "🟢"
+
+                    lines.append(
+                        f"{emoji} {cat['name']}: {format_money(spent)}/{format_money(budget)}"
+                    )
+                    lines.append(f"   {status} [{bar}] {progress}%")
+                else:
+                    # Нет бюджета - просто показываем сумму расходов
+                    lines.append(f"{emoji} {cat['name']}: {format_money(spent)}")
 
     return "\n".join(lines)
 

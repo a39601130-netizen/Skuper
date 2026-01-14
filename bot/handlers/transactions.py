@@ -231,7 +231,8 @@ async def proceed_after_date(query, trans, day):
             sheets = get_sheets_service()
             refs = sheets.get_references()
             accounts = refs["accounts"]
-        except:
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить счета: {e}")
             accounts = ["Наличные", "Карта", "Карта Сбер"]
 
         await query.edit_message_text(
@@ -246,7 +247,8 @@ async def proceed_after_date(query, trans, day):
             sheets = get_sheets_service()
             refs = sheets.get_references()
             accounts = refs["accounts"]
-        except:
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить счета: {e}")
             accounts = ["Наличные", "Карта", "Карта Сбер"]
 
         await query.edit_message_text(
@@ -261,7 +263,8 @@ async def proceed_after_date(query, trans, day):
             sheets = get_sheets_service()
             refs = sheets.get_references()
             accounts = refs["accounts"]
-        except:
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить счета: {e}")
             accounts = ["Наличные", "Карта", "Карта Сбер"]
 
         await query.edit_message_text(
@@ -299,7 +302,8 @@ async def enter_custom_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 sheets = get_sheets_service()
                 refs = sheets.get_references()
                 accounts = refs["accounts"]
-            except:
+            except Exception as e:
+                logger.warning(f"Не удалось загрузить счета: {e}")
                 accounts = ["Наличные", "Карта", "Карта Сбер"]
 
             await update.message.reply_text(
@@ -314,7 +318,8 @@ async def enter_custom_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 sheets = get_sheets_service()
                 refs = sheets.get_references()
                 accounts = refs["accounts"]
-            except:
+            except Exception as e:
+                logger.warning(f"Не удалось загрузить счета: {e}")
                 accounts = ["Наличные", "Карта", "Карта Сбер"]
 
             await update.message.reply_text(
@@ -329,7 +334,8 @@ async def enter_custom_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 sheets = get_sheets_service()
                 refs = sheets.get_references()
                 accounts = refs["accounts"]
-            except:
+            except Exception as e:
+                logger.warning(f"Не удалось загрузить счета: {e}")
                 accounts = ["Наличные", "Карта", "Карта Сбер"]
 
             await update.message.reply_text(
@@ -359,17 +365,17 @@ async def select_account_callback(update: Update, context: ContextTypes.DEFAULT_
     if data.startswith("expense_"):
         account = data.replace("expense_", "")
         trans.account = account
+        trans.currency = "BYN"  # Всегда BYN для обычных расходов
 
         day_str = f" (📅 {trans.day} число)" if trans.day else ""
         await query.edit_message_text(
             f"💸 **Расход**{day_str}\n"
             f"📁 Категория: {trans.category}\n"
             f"💳 Счёт: {account}\n\n"
-            f"🏦 В какой валюте расход?",
-            parse_mode="Markdown",
-            reply_markup=get_currency_keyboard()
+            f"💵 Введи сумму:",
+            parse_mode="Markdown"
         )
-        return TransactionStates.SELECT_CURRENCY
+        return TransactionStates.ENTER_AMOUNT
 
     # Выбор счета для дохода
     if data.startswith("income_"):
@@ -393,9 +399,9 @@ async def select_account_callback(update: Update, context: ContextTypes.DEFAULT_
             sheets = get_sheets_service()
             refs = sheets.get_references()
             accounts = [a for a in refs["accounts"] if a != account]
-        except:
-            accounts = ["Наличные", "Карта", "Карта Сбер"]
-            accounts = [a for a in accounts if a != account]
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить счета: {e}")
+            accounts = [a for a in ["Наличные", "Карта", "Карта Сбер"] if a != account]
 
         await query.edit_message_text(
             f"🔄 **Перевод**\n"
@@ -415,9 +421,9 @@ async def select_account_callback(update: Update, context: ContextTypes.DEFAULT_
             sheets = get_sheets_service()
             refs = sheets.get_references()
             accounts = [a for a in refs["accounts"] if a != account]
-        except:
-            accounts = ["Наличные", "Карта", "Карта Сбер"]
-            accounts = [a for a in accounts if a != account]
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить счета: {e}")
+            accounts = [a for a in ["Наличные", "Карта", "Карта Сбер"] if a != account]
 
         await query.edit_message_text(
             f"💱 **Обмен валюты**\n"
@@ -619,7 +625,8 @@ async def select_category_callback(update: Update, context: ContextTypes.DEFAULT
             sheets = get_sheets_service()
             refs = sheets.get_references()
             categories = refs["categories"]
-        except:
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить категории: {e}")
             categories = ["Продукты", "Кафе", "Транспорт", "Такси", "Досуг", "Покупки",
                          "Здоровье", "Связь", "ЖКХ", "Одежда"]
 
@@ -640,7 +647,8 @@ async def select_category_callback(update: Update, context: ContextTypes.DEFAULT
             sheets = get_sheets_service()
             refs = sheets.get_references()
             accounts = refs["accounts"]
-        except:
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить счета: {e}")
             accounts = ["Наличные", "Карта", "Карта Сбер"]
 
         day_str = f" (📅 {trans.day} число)" if trans.day else ""
@@ -673,7 +681,8 @@ async def select_category_callback(update: Update, context: ContextTypes.DEFAULT
                 sheets = get_sheets_service()
                 refs = sheets.get_references()
                 accounts = refs["accounts"]
-            except:
+            except Exception as e:
+                logger.warning(f"Не удалось загрузить счета: {e}")
                 accounts = ["Наличные", "Карта", "Карта Сбер"]
 
             day_str = f" (📅 {trans.day} число)" if trans.day else ""

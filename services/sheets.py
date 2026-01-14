@@ -61,12 +61,127 @@ def safe_int(value, default=0) -> int:
     """Безопасное преобразование в int"""
     if value is None or value == "":
         return default
-    
+
     try:
         # Сначала преобразуем в float (на случай "1,0"), потом в int
         return int(safe_float(value, default))
     except (ValueError, TypeError):
         return default
+
+
+class BaseSheetsService:
+    """Базовый класс для работы с Google Sheets"""
+
+    def __init__(self, spreadsheet_id: str):
+        self.spreadsheet_id = spreadsheet_id
+        self.client = None
+        self.spreadsheet = None
+        self._last_connect = 0
+        self._connect()
+
+    def _connect(self):
+        """Подключение к Google Sheets"""
+        try:
+            scope = [
+                "https://spreadsheets.google.com/feeds",
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive"
+            ]
+            creds = ServiceAccountCredentials.from_json_keyfile_name(
+                config.GOOGLE_CREDENTIALS_FILE, scope
+            )
+            self.client = gspread.authorize(creds)
+            self.spreadsheet = self.client.open_by_key(self.spreadsheet_id)
+            self._last_connect = time.time()
+            logger.info(f"Connected to Google Sheets: {self.spreadsheet_id}")
+        except Exception as e:
+            logger.error(f"Failed to connect to Google Sheets: {e}")
+            raise
+
+    def _ensure_connection(self):
+        """Переподключение если соединение устарело (>30 мин)"""
+        if time.time() - self._last_connect > 1800:
+            logger.info("Reconnecting to Google Sheets (connection expired)")
+            self._connect()
+
+    def get_sheet(self, sheet_name: str) -> gspread.Worksheet:
+        """Получить лист по имени"""
+        self._ensure_connection()
+        try:
+            return self.spreadsheet.worksheet(sheet_name)
+        except gspread.WorksheetNotFound:
+            logger.error(f"Sheet not found: {sheet_name}")
+            raise
+
+    def get_all_records(self, sheet_name: str) -> List[Dict]:
+        """Получить все записи с листа как список словарей"""
+        sheet = self.get_sheet(sheet_name)
+        return sheet.get_all_records()
+
+    def append_row(self, sheet_name: str, row: List[Any]) -> int:
+        """Добавить строку в конец листа, вернуть номер строки"""
+        sheet = self.get_sheet(sheet_name)
+        sheet.append_row(row, value_input_option='USER_ENTERED')
+        return len(sheet.get_all_values())
+
+    def update_cell(self, sheet_name: str, row: int, col: int, value: Any):
+        """Обновить конкретную ячейку"""
+        sheet = self.get_sheet(sheet_name)
+        sheet.update_cell(row, col, value)
+
+    def update_row(self, sheet_name: str, row_num: int, values: List[Any]):
+        """Обновить целую строку"""
+        sheet = self.get_sheet(sheet_name)
+        end_col = gspread.utils.rowcol_to_a1(1, len(values))[0]
+        range_str = f"A{row_num}:{end_col}{row_num}"
+        sheet.update(range_str, [values], value_input_option='USER_ENTERED')
+
+    def find_row_by_value(self, sheet_name: str, column: int, value: Any) -> Optional[int]:
+        """Найти номер строки по значению в колонке"""
+        sheet = self.get_sheet(sheet_name)
+        try:
+            cell = sheet.find(str(value), in_column=column)
+            return cell.row if cell else None
+        except gspread.CellNotFound:
+            return None
+
+    def get_last_row_number(self, sheet_name: str) -> int:
+        """Получить номер последней непустой строки"""
+        sheet = self.get_sheet(sheet_name)
+        values = sheet.get_all_values()
+        return len(values)
+
+    def batch_update(self, sheet_name: str, updates: List[Dict[str, Any]]):
+        """
+        Пакетное обновление ячеек
+
+        Args:
+            sheet_name: Имя листа
+            updates: Список словарей вида [{'range': 'A1', 'value': 123}, ...]
+        """
+        if not updates:
+            return
+
+        sheet = self.get_sheet(sheet_name)
+
+        # Формируем данные для batch_update
+        data = []
+        for upd in updates:
+            range_name = upd['range']
+            value = upd['value']
+            data.append({
+                'range': range_name,
+                'values': [[value]]
+            })
+
+        # Выполняем batch update
+        sheet.batch_update(data, value_input_option='USER_ENTERED')
+
+    def delete_row(self, sheet_name: str, row_num: int):
+        """Удалить строку по номеру"""
+        sheet = self.get_sheet(sheet_name)
+        sheet.delete_rows(row_num)
+
 
 class GoogleSheetsService:
     """Сервис для работы с Google Sheets таблицей бюджета"""
@@ -75,6 +190,10 @@ class GoogleSheetsService:
         self.client = None
         self.spreadsheet = None
         self._last_connect = 0
+        # Кэш для справочников (уменьшает запросы к API)
+        self._references_cache = None
+        self._references_cache_time = 0
+        self._cache_ttl = 300  # 5 минут
         self._connect()
 
     def _connect(self):
@@ -99,17 +218,27 @@ class GoogleSheetsService:
             self._connect()
     
     @retry_on_error(max_retries=3, delay=1.0)
-    def get_references(self) -> Dict[str, List[str]]:
-        """Получить справочники (типы, счета, категории)"""
+    def get_references(self, force_refresh: bool = False) -> Dict[str, List[str]]:
+        """
+        Получить справочники (типы, счета, категории)
+
+        Args:
+            force_refresh: Принудительное обновление кэша
+        """
+        # Проверяем кэш
+        if not force_refresh and self._references_cache:
+            if time.time() - self._references_cache_time < self._cache_ttl:
+                return self._references_cache
+
         self._ensure_connection()
         sheet = self.spreadsheet.worksheet(config.SHEET_REFERENCES)
         data = sheet.get_all_values()
-        
+
         # Парсим данные начиная с 4-й строки (индекс 3)
         types = []
         accounts = []
         categories = []
-        
+
         for row in data[3:]:  # Пропускаем заголовки
             if row[0] and row[0].strip():
                 types.append(row[0].strip())
@@ -117,12 +246,16 @@ class GoogleSheetsService:
                 accounts.append(row[1].strip())
             if row[2] and row[2].strip():
                 categories.append(row[2].strip())
-        
-        return {
+
+        # Сохраняем в кэш
+        self._references_cache = {
             "types": types,
             "accounts": accounts,
             "categories": categories
         }
+        self._references_cache_time = time.time()
+
+        return self._references_cache
 
     @retry_on_error(max_retries=3, delay=1.0)
     def ensure_exchange_type_exists(self) -> bool:
@@ -279,11 +412,47 @@ class GoogleSheetsService:
         """Получить сводку за текущий месяц"""
         categories = self.get_categories_budget()
         accounts = self.get_accounts_balance()
-        
-        total_income = sum(c["spent"] for c in categories if c["type"] == "Доход")
+
+        # Считаем доходы напрямую из листа "Транзакции"
+        # так как формулы в листе "Категории" могут не работать
+        self._ensure_connection()
+        sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
+        data = sheet.get_all_values()
+
+        total_income = 0.0
+        income_by_category = {}
+
+        # Проходим по всем транзакциям (пропускаем первые 3 строки - настройки и заголовки)
+        for row in data[3:]:
+            if row[0] and row[0].strip() and len(row) > 4:
+                trans_type = row[1].strip() if row[1] else ""
+                category = row[3].strip() if len(row) > 3 and row[3] else ""
+                amount_str = row[4].strip() if row[4] else "0"
+
+                # Подсчитываем только доходы
+                if trans_type == "Доход":
+                    try:
+                        amount = float(amount_str.replace(",", ".").replace(" ", ""))
+                        total_income += amount
+
+                        # Группируем по категориям
+                        if category:
+                            income_by_category[category] = income_by_category.get(category, 0.0) + amount
+                    except (ValueError, AttributeError):
+                        continue
+
+        logger.info(f"Total income from transactions: {total_income}")
+        logger.info(f"Income by category: {income_by_category}")
+
+        # Расходы берем из категорий (там формулы работают)
         total_expense = sum(c["spent"] for c in categories if c["type"] == "Расход")
         total_balance = sum(a["current"] for a in accounts if a["currency"] == "BYN")
-        
+
+        # Обновляем категории доходов с реальными данными из транзакций
+        for cat in categories:
+            if cat["type"] == "Доход":
+                cat["spent"] = income_by_category.get(cat["name"], 0.0)
+
         # Категории с превышением бюджета
         over_budget = [
             c for c in categories 
@@ -413,12 +582,13 @@ class GoogleSheetsService:
         }
 
     @retry_on_error(max_retries=3, delay=1.0)
-    def get_account_expenses(self, account_name: str) -> float:
+    def get_account_expenses(self, account_name: str, exclude_categories: List[str] = None) -> float:
         """
         Получить сумму расходов по счету за текущий месяц
 
         Args:
             account_name: Название счета
+            exclude_categories: Категории для исключения из подсчета
 
         Returns:
             float: Сумма расходов
@@ -427,17 +597,22 @@ class GoogleSheetsService:
         sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
         data = sheet.get_all_values()
 
+        if exclude_categories is None:
+            exclude_categories = []
+
         total_expenses = 0.0
 
         for row in data[3:]:  # Пропускаем настройки и заголовки
             if row[0] and row[0].strip() and len(row) > 4:
                 trans_type = row[1]  # Тип транзакции
                 account = row[2].strip()  # Счёт
+                category = row[3].strip() if len(row) > 3 else ""  # Категория
                 amount = safe_float(row[4])  # Сумма
 
-                # Считаем только расходы с указанного счета
+                # Считаем только расходы с указанного счета, исключая определенные категории
                 if trans_type == "Расход" and account == account_name:
-                    total_expenses += amount
+                    if category not in exclude_categories:
+                        total_expenses += amount
 
         return total_expenses
 
@@ -484,16 +659,26 @@ class GoogleSheetsService:
                     amount = safe_float(row[4])
                     hours = safe_float(row[8]) if len(row) > 8 else 0
 
+                    # Получаем валюту (колонка M) и сумму в BYN (колонка L)
+                    currency = row[12] if len(row) > 12 else "BYN"
+                    amount_byn = safe_float(row[11]) if len(row) > 11 and row[11] else amount
+
+                    # Если валюта не BYN, используем эквивалент в BYN (колонка L)
+                    if currency and currency != "BYN":
+                        amount_to_count = amount_byn
+                    else:
+                        amount_to_count = amount
+
                     if trans_type == "Доход":
-                        total_income += amount
+                        total_income += amount_to_count
                         total_hours += hours
                         if category:
-                            income_by_category[category] = income_by_category.get(category, 0) + amount
+                            income_by_category[category] = income_by_category.get(category, 0) + amount_to_count
 
                     elif trans_type == "Расход":
-                        total_expense += amount
+                        total_expense += amount_to_count
                         if category:
-                            expense_by_category[category] = expense_by_category.get(category, 0) + amount
+                            expense_by_category[category] = expense_by_category.get(category, 0) + amount_to_count
 
         # Сортируем категории по сумме (по убыванию)
         income_by_category = dict(sorted(income_by_category.items(), key=lambda x: x[1], reverse=True))

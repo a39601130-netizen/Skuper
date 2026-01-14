@@ -39,10 +39,9 @@ async def advisor_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Получаем совет от AI
         advisor = get_advisor()
         advice = await advisor.get_advice(budget_data)
-        
+
         await update.message.reply_text(
-            f"🤖 **AI Советник:**\n\n{advice}",
-            parse_mode="Markdown",
+            f"🤖 AI Советник:\n\n{advice}",
             reply_markup=get_advisor_keyboard()
         )
         
@@ -74,11 +73,10 @@ async def advisor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         advisor = get_advisor()
         advice = await advisor.get_advice(budget_data)
-        
+
         await context.bot.send_message(
             chat_id=query.message.chat_id,
-            text=f"🤖 **AI Советник:**\n\n{advice}",
-            parse_mode="Markdown",
+            text=f"🤖 AI Советник:\n\n{advice}",
             reply_markup=get_advisor_keyboard()
         )
         
@@ -141,10 +139,9 @@ async def advisor_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         advisor = get_advisor()
         advice = await advisor.get_advice(budget_data, user_question=question)
-        
+
         await update.message.reply_text(
-            f"🤖 **Ответ:**\n\n{advice}",
-            parse_mode="Markdown",
+            f"🤖 Ответ:\n\n{advice}",
             reply_markup=get_advisor_keyboard()
         )
         

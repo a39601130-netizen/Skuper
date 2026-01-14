@@ -51,3 +51,15 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Server specific
+*.pid
+*.sock
+nohup.out
+
+# Backup files
+*.bak
+*.backup
+
+# Claude/AI tools
+.claude/settings.local.json
