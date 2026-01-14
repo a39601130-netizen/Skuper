@@ -4,8 +4,16 @@ DeepSeek AI Советник
 """
 import logging
 import httpx
+import re
 from typing import Optional
 import config
+
+# Предкомпилированные регулярные выражения для производительности
+_HEADER_PATTERNS = [
+    (re.compile(r'^### (.+)$', re.MULTILINE), r'**\1**'),
+    (re.compile(r'^## (.+)$', re.MULTILINE), r'**\1**'),
+    (re.compile(r'^# (.+)$', re.MULTILINE), r'**\1**'),
+]
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +76,14 @@ class AIAdvisor:
                 
                 response.raise_for_status()
                 data = response.json()
-                
-                return data["choices"][0]["message"]["content"]
+
+                answer = data["choices"][0]["message"]["content"]
+
+                # Постобработка: заменяем ### на жирный текст (Telegram не поддерживает заголовки)
+                for pattern, replacement in _HEADER_PATTERNS:
+                    answer = pattern.sub(replacement, answer)
+
+                return answer
                 
         except httpx.TimeoutException:
             logger.error("DeepSeek API timeout")
@@ -102,6 +116,8 @@ class AIAdvisor:
 - Кратко и по делу (2-3 предложения)
 - Используй emoji для структуры
 - Без лишних объяснений
+- ВАЖНО: Используй только **жирный текст** для заголовков, НЕ используй # или ## или ###
+- Поддерживаемый формат: **жирный**, _курсив_, строки с emoji
 """
         elif mode == "detailed":
             base_prompt += """
@@ -110,6 +126,8 @@ class AIAdvisor:
 - Структурируй информацию
 - Приводи конкретные цифры и рекомендации
 - Используй emoji для наглядности
+- ВАЖНО: Используй только **жирный текст** для заголовков, НЕ используй # или ## или ###
+- Поддерживаемый формат: **жирный**, _курсив_, строки с emoji
 """
         else:  # default
             base_prompt += """
@@ -117,6 +135,8 @@ class AIAdvisor:
 - Сбалансированный по длине
 - Конкретные рекомендации
 - Используй emoji умеренно
+- ВАЖНО: Используй только **жирный текст** для заголовков, НЕ используй # или ## или ###
+- Поддерживаемый формат: **жирный**, _курсив_, строки с emoji
 """
         
         return base_prompt

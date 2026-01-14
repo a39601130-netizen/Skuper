@@ -42,6 +42,7 @@ async def advisor_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
             f"🤖 AI Советник:\n\n{advice}",
+            parse_mode="Markdown",
             reply_markup=get_advisor_keyboard()
         )
         
@@ -77,6 +78,7 @@ async def advisor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text=f"🤖 AI Советник:\n\n{advice}",
+            parse_mode="Markdown",
             reply_markup=get_advisor_keyboard()
         )
         
@@ -142,6 +144,7 @@ async def advisor_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
             f"🤖 Ответ:\n\n{advice}",
+            parse_mode="Markdown",
             reply_markup=get_advisor_keyboard()
         )
         

@@ -448,15 +448,26 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
 
     by_day = data["by_day"]
     sorted_days = data["sorted_days"]
+    month = data.get("month", datetime.now().month)
+    year = data.get("year", datetime.now().year)
 
-    # Эмодзи для дней недели (опционально, можно добавить если знаем день недели)
-    day_emoji = "📅"
+    # Названия дней недели
+    weekday_names = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
     for day in sorted_days:
         day_data = by_day[day]
 
+        # Определяем день недели
+        try:
+            day_num = int(day)
+            date_obj = datetime(year, month, day_num)
+            weekday = weekday_names[date_obj.weekday()]
+            day_header = f"**{day} ({weekday})**"
+        except (ValueError, IndexError):
+            day_header = f"**День {day}**"
+
         # Заголовок дня
-        lines.append(f"\n{day_emoji} **День {day}** — {format_money(day_data['total'])}")
+        lines.append(f"\n📅 {day_header} — {format_money(day_data['total'])}")
 
         # Чаевые
         if day_data["tips"] > 0:

@@ -177,6 +177,10 @@ async def menu_callback(update: Update, context):
             await stats_callback(update, context)
         elif data == "finance_history":
             await history_callback(update, context)
+        elif data == "finance_income_stats":
+            await income_stats_callback(update, context)
+        elif data == "finance_weekly":
+            await weekly_report_callback(update, context)
 
         # === МОДУЛЬ ТРЕНИРОВКИ ===
         elif data == "module_workout":
@@ -247,7 +251,31 @@ async def handle_text(update: Update, context):
         return
 
     # Проверяем на reply клавиатуру
-    if text in ["➕ расход", "расход"]:
+    if text in ["💰 финансы", "финансы"]:
+        await update.message.reply_text(
+            "💰 **ФИНАНСЫ**\n\nВыбери действие:",
+            parse_mode="Markdown",
+            reply_markup=get_finance_menu()
+        )
+        return
+
+    elif text in ["🏋️ тренировки", "тренировки"]:
+        await update.message.reply_text(
+            "🏋️ **ТРЕНИРОВКИ**\n\nВыбери действие:",
+            parse_mode="Markdown",
+            reply_markup=get_workout_menu()
+        )
+        return
+
+    elif text in ["🤖 советник", "советник"]:
+        await update.message.reply_text(
+            "🤖 **AI СОВЕТНИК**\n\nВыбери что проанализировать:",
+            parse_mode="Markdown",
+            reply_markup=get_advisor_menu()
+        )
+        return
+
+    elif text in ["➕ расход", "расход"]:
         from bot.keyboards.menus import get_quick_expense_keyboard
         await update.message.reply_text(
             "💸 **Расход**\n\nВыбери категорию:",
@@ -271,10 +299,6 @@ async def handle_text(update: Update, context):
 
     elif text in ["📊 статистика", "статистика"]:
         await stats_command(update, context)
-        return
-
-    elif text in ["🤖 советник", "советник"]:
-        await advisor_command(update, context)
         return
 
     # Иначе пробуем парсить как быстрый ввод
@@ -365,6 +389,7 @@ def main():
         entry_points=[
             CommandHandler("add", add_command),
             CallbackQueryHandler(menu_add_callback, pattern="^(menu_add|finance_add)$"),
+            CallbackQueryHandler(select_type_callback, pattern="^add_(expense|income|transfer|exchange)$"),
             CallbackQueryHandler(select_category_callback, pattern="^(quick_|show_all)")
         ],
         states={

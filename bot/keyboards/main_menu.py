@@ -25,11 +25,16 @@ def get_finance_menu() -> InlineKeyboardMarkup:
     """Меню финансов"""
     keyboard = [
         [
-            InlineKeyboardButton("➕ Добавить", callback_data="finance_add"),
+            InlineKeyboardButton("💸 Расход", callback_data="add_expense"),
+            InlineKeyboardButton("💰 Доход", callback_data="add_income")
         ],
         [
             InlineKeyboardButton("💳 Балансы", callback_data="finance_balance"),
             InlineKeyboardButton("📊 Статистика", callback_data="finance_stats")
+        ],
+        [
+            InlineKeyboardButton("💵 Доходы", callback_data="finance_income_stats"),
+            InlineKeyboardButton("📈 Еженедельный отчет", callback_data="finance_weekly")
         ],
         [
             InlineKeyboardButton("📜 История", callback_data="finance_history")

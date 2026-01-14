@@ -193,7 +193,7 @@ class GoogleSheetsService:
         # Кэш для справочников (уменьшает запросы к API)
         self._references_cache = None
         self._references_cache_time = 0
-        self._cache_ttl = 300  # 5 минут
+        self._cache_ttl = 600  # 10 минут - справочники редко меняются
         self._connect()
 
     def _connect(self):
@@ -533,6 +533,11 @@ class GoogleSheetsService:
         sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
         data = sheet.get_all_values()
 
+        # Получаем текущий месяц и год из настроек
+        period = self.get_current_month_settings()
+        month = period["month"]
+        year = period["year"]
+
         # Группируем доходы по дням
         income_by_day = {}
 
@@ -578,7 +583,9 @@ class GoogleSheetsService:
             "sorted_days": sorted_days,
             "total_income": sum(d["total"] for d in income_by_day.values()),
             "total_tips": sum(d["tips"] for d in income_by_day.values()),
-            "total_hours": sum(d["hours"] for d in income_by_day.values())
+            "total_hours": sum(d["hours"] for d in income_by_day.values()),
+            "month": month,
+            "year": year
         }
 
     @retry_on_error(max_retries=3, delay=1.0)

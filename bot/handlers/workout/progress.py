@@ -186,7 +186,7 @@ async def workout_ai_analysis_callback(update: Update, context: ContextTypes.DEF
 
     await query.edit_message_text(
         text,
-        parse_mode=None,
+        parse_mode="Markdown",
         reply_markup=get_back_to_main()
     )
 

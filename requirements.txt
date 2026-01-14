@@ -5,8 +5,8 @@ python-telegram-bot==20.7
 gspread==5.12.4
 oauth2client==4.1.3
 
-# HTTP клиент для DeepSeek (версия автоматически совместимая)
-httpx
+# HTTP клиент для DeepSeek
+httpx>=0.25.0,<1.0.0
 
 # Переменные окружения
 python-dotenv==1.0.0

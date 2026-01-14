@@ -61,11 +61,31 @@ def get_accounts_keyboard(accounts: list, prefix: str = "acc") -> InlineKeyboard
     """Клавиатура выбора счета"""
     keyboard = []
 
+    # Маппинг эмодзи для счетов
+    account_emoji = {
+        "Наличные": "💵",
+        "Карта": "🔴",
+        "Карта Сбер": "🟢",
+        "На Аренду": "🏠",
+        "Копилка Тинькофф": "🐷",
+        "На доллары": "💵",
+        "Наличка в Рублях": "💸",
+        "Назад": "↩️"
+    }
+
+    # Маппинг названий для отображения
+    account_display_names = {
+        "Карта": "Карта Альфа"
+    }
+
     # По 2 счета в ряд
     row = []
     for acc in accounts:
+        emoji = account_emoji.get(acc, "💳")
+        display_name = account_display_names.get(acc, acc)
+
         row.append(InlineKeyboardButton(
-            f"💳 {acc}",
+            f"{emoji} {display_name}",
             callback_data=f"{prefix}_{acc}"
         ))
         if len(row) == 2:
@@ -169,12 +189,11 @@ def get_confirm_keyboard() -> InlineKeyboardMarkup:
 def get_reply_keyboard() -> ReplyKeyboardMarkup:
     """Постоянная клавиатура внизу экрана"""
     keyboard = [
-        ["➕ Расход", "💰 Доход"],
-        ["💳 Баланс", "📊 Статистика"],
+        ["💰 Финансы", "🏋️ Тренировки"],
         ["🤖 Советник"]
     ]
     return ReplyKeyboardMarkup(
-        keyboard, 
+        keyboard,
         resize_keyboard=True,
         input_field_placeholder="Введи: сумма категория комментарий"
     )
