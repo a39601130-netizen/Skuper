@@ -553,6 +553,7 @@ class GoogleSheetsService:
                     if day not in income_by_day:
                         income_by_day[day] = {
                             "total": 0,
+                            "salary": 0,
                             "tips": 0,
                             "hours": 0,
                             "other": 0,
@@ -561,10 +562,12 @@ class GoogleSheetsService:
 
                     income_by_day[day]["total"] += amount
 
-                    # Разделяем на чаевые и другое
-                    if category == "Зарплата/Чаевые":
+                    # Разделяем на зарплату, чаевые и другое
+                    if category == "Чаевые":
                         income_by_day[day]["tips"] += amount
                         income_by_day[day]["hours"] += hours
+                    elif category == "Зарплата":
+                        income_by_day[day]["salary"] += amount
                     else:
                         income_by_day[day]["other"] += amount
 
@@ -582,6 +585,7 @@ class GoogleSheetsService:
             "by_day": income_by_day,
             "sorted_days": sorted_days,
             "total_income": sum(d["total"] for d in income_by_day.values()),
+            "total_salary": sum(d["salary"] for d in income_by_day.values()),
             "total_tips": sum(d["tips"] for d in income_by_day.values()),
             "total_hours": sum(d["hours"] for d in income_by_day.values()),
             "month": month,

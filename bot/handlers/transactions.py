@@ -733,10 +733,10 @@ async def enter_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 all_categories = sheets.get_categories_budget()
                 income_categories = [c["name"] for c in all_categories if c["type"] == "Доход"]
                 if not income_categories:
-                    income_categories = ["Зарплата/Чаевые", "Подработка", "Другое"]
+                    income_categories = ["Зарплата", "Чаевые", "Подработка", "Другое"]
             except Exception as e:
                 logger.error(f"Ошибка загрузки категорий: {e}")
-                income_categories = ["Зарплата/Чаевые", "Подработка", "Другое"]
+                income_categories = ["Зарплата", "Чаевые", "Подработка", "Другое"]
 
             await update.message.reply_text(
                 f"💰 Сумма: **{amount}** BYN\n\n📁 Выбери категорию дохода:",
@@ -810,15 +810,15 @@ async def enter_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         trans.day = datetime.now().day
     
     logger.info(f"enter_comment: type={trans.trans_type}, category={trans.category}")
-    
-    # Для дохода с категорией "Зарплата/Чаевые" спрашиваем часы
-    if trans.trans_type == "Доход" and trans.category == "Зарплата/Чаевые":
+
+    # Для дохода с категорией "Чаевые" спрашиваем часы (только для чаевых!)
+    if trans.trans_type == "Доход" and trans.category == "Чаевые":
         await update.message.reply_text(
             "⏰ Сколько часов отработано?\n(введи число или /skip)",
             parse_mode="Markdown"
         )
         return TransactionStates.ENTER_HOURS
-    
+
     return await show_confirmation(update, context)
 
 

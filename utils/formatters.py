@@ -234,7 +234,7 @@ def parse_quick_input(text: str) -> Optional[Dict[str, Any]]:
 
     Форматы:
     - "50 продукты магазин" -> Расход 50, Продукты, комментарий "магазин"
-    - "135 чаевые смена 10ч" -> Доход 135, Зарплата/Чаевые, 10 часов
+    - "135 чаевые смена 10ч" -> Доход 135, Чаевые, 10 часов
     - "перевод 100 карта" -> Перевод 100 на Карту
 
     Returns:
@@ -302,9 +302,9 @@ def parse_quick_input(text: str) -> Optional[Dict[str, Any]]:
     # Маппинг сокращений категорий
     category_map = {
         # Доходы
-        "чаевые": "Зарплата/Чаевые",
-        "зарплата": "Зарплата/Чаевые",
-        "зп": "Зарплата/Чаевые",
+        "чаевые": "Чаевые",
+        "зарплата": "Зарплата",
+        "зп": "Зарплата",
         "подработка": "Подработка",
 
         # Расходы
@@ -381,7 +381,7 @@ def parse_quick_input(text: str) -> Optional[Dict[str, Any]]:
     logger.info(f"[PARSE] Mapped category: {category}")
 
     # Определяем тип по категории
-    income_categories = ["Зарплата/Чаевые", "Подработка", "Другое"]
+    income_categories = ["Зарплата", "Чаевые", "Подработка", "Другое"]
     trans_type = "Доход" if category in income_categories else "Расход"
 
     logger.info(f"[PARSE] Type: {trans_type}")
