@@ -313,19 +313,30 @@ class GoogleSheetsService:
         self._ensure_connection()
         sheet = self.spreadsheet.worksheet(config.SHEET_CATEGORIES)
         data = sheet.get_all_values()
-        
+
+        logger.info(f"📋 Читаю лист 'Категории', всего строк: {len(data)}")
+
         categories = []
-        for row in data[1:]:  # Пропускаем заголовок
+        for idx, row in enumerate(data[1:], start=2):  # Пропускаем заголовок, нумерация с 2
             if row[1] and row[1].strip():
+                cat_name = row[1].strip()
+                cat_type = row[0].strip() if row[0] else ""
+
+                # Отладка для всех категорий расходов
+                if cat_type == "Расход":
+                    logger.info(f"  Строка {idx}: {cat_name}")
+                    logger.info(f"    row[2] (budget) = '{row[2]}' -> {safe_float(row[2]) if row[2] else 0}")
+                    logger.info(f"    row[3] (spent) = '{row[3]}' -> {safe_float(row[3]) if row[3] else 0}")
+
                 categories.append({
-                    "type": row[0].strip(),
-                    "name": row[1].strip(),
+                    "type": cat_type,
+                    "name": cat_name,
                     "budget": safe_float(row[2]) if row[2] else 0,
                     "spent": safe_float(row[3]) if row[3] else 0,
                     "remaining": safe_float(row[4]) if row[4] else 0,
                     "progress": safe_float(row[5]) if row[5] else 0
                 })
-        
+
         return categories
     
     @retry_on_error(max_retries=3, delay=1.0)
@@ -405,9 +416,70 @@ class GoogleSheetsService:
             return True
 
         except Exception as e:
-            print(f"Ошибка записи в Google Sheets: {e}")
+            logger.error(f"Ошибка записи в Google Sheets: {e}")
             return False
-    
+
+    @retry_on_error(max_retries=3, delay=1.0)
+    def get_last_exchange_rate(self, currency: str = "USD") -> Optional[float]:
+        """
+        Получить последний курс обмена валюты из истории транзакций
+
+        Args:
+            currency: Валюта для которой нужен курс (USD, EUR, RUB)
+
+        Returns:
+            Последний курс обмена или None если не найден
+        """
+        try:
+            self._ensure_connection()
+            sheet = self.spreadsheet.worksheet(config.SHEET_TRANSACTIONS)
+            data = sheet.get_all_values()
+
+            # Ищем последнюю транзакцию "Обмен валюты" с нужной валютой
+            # Идем с конца для поиска последнего курса
+            for row in reversed(data[3:]):  # Пропускаем заголовки
+                if len(row) > 12:  # Проверяем что есть все колонки
+                    trans_type = row[1].strip() if row[1] else ""
+                    row_currency = row[12].strip() if row[12] else ""  # Колонка M (валюта)
+                    exchange_rate_str = row[10].strip() if row[10] else ""  # Колонка K (курс)
+
+                    # Если это обмен валюты с нужной валютой и есть курс
+                    if trans_type == "Обмен валюты" and row_currency == currency and exchange_rate_str:
+                        try:
+                            rate = safe_float(exchange_rate_str)
+                            if rate > 0:
+                                logger.info(f"Найден последний курс {currency}: {rate}")
+                                return rate
+                        except (ValueError, AttributeError):
+                            continue
+
+            logger.info(f"Курс {currency} не найден в истории")
+            return None
+
+        except Exception as e:
+            logger.error(f"Ошибка получения курса обмена: {e}")
+            return None
+
+    def get_account_currency(self, account_name: str) -> str:
+        """
+        Получить валюту счета
+
+        Args:
+            account_name: Название счета
+
+        Returns:
+            Валюта счета (BYN, USD, EUR, RUB), по умолчанию BYN
+        """
+        try:
+            accounts = self.get_accounts_balance()
+            for acc in accounts:
+                if acc["name"] == account_name:
+                    return acc.get("currency", "BYN")
+            return "BYN"
+        except Exception as e:
+            logger.error(f"Ошибка получения валюты счета: {e}")
+            return "BYN"
+
     def get_monthly_summary(self) -> Dict[str, Any]:
         """Получить сводку за текущий месяц"""
         categories = self.get_categories_budget()
@@ -420,7 +492,9 @@ class GoogleSheetsService:
         data = sheet.get_all_values()
 
         total_income = 0.0
+        total_expense = 0.0
         income_by_category = {}
+        expense_by_category = {}
 
         # Проходим по всем транзакциям (пропускаем первые 3 строки - настройки и заголовки)
         for row in data[3:]:
@@ -429,29 +503,48 @@ class GoogleSheetsService:
                 category = row[3].strip() if len(row) > 3 and row[3] else ""
                 amount_str = row[4].strip() if row[4] else "0"
 
-                # Подсчитываем только доходы
-                if trans_type == "Доход":
-                    try:
-                        amount = float(amount_str.replace(",", ".").replace(" ", ""))
-                        total_income += amount
+                # Получаем валюту и эквивалент в BYN
+                currency = row[12].strip() if len(row) > 12 and row[12] else "BYN"
+                amount_to_str = row[11].strip() if len(row) > 11 and row[11] else ""
 
-                        # Группируем по категориям
+                try:
+                    amount = float(amount_str.replace(",", ".").replace(" ", ""))
+
+                    # Определяем сумму в BYN
+                    if currency != "BYN" and amount_to_str:
+                        # Для валютных операций берём эквивалент из колонки L
+                        amount_byn = float(amount_to_str.replace(",", ".").replace(" ", ""))
+                    else:
+                        amount_byn = amount
+
+                    # Подсчитываем доходы
+                    if trans_type == "Доход":
+                        total_income += amount_byn
                         if category:
-                            income_by_category[category] = income_by_category.get(category, 0.0) + amount
-                    except (ValueError, AttributeError):
-                        continue
+                            income_by_category[category] = income_by_category.get(category, 0.0) + amount_byn
 
-        logger.info(f"Total income from transactions: {total_income}")
-        logger.info(f"Income by category: {income_by_category}")
+                    # Подсчитываем расходы
+                    elif trans_type == "Расход":
+                        total_expense += amount_byn
+                        if category:
+                            expense_by_category[category] = expense_by_category.get(category, 0.0) + amount_byn
 
-        # Расходы берем из категорий (там формулы работают)
-        total_expense = sum(c["spent"] for c in categories if c["type"] == "Расход")
+                except (ValueError, AttributeError):
+                    continue
+
         total_balance = sum(a["current"] for a in accounts if a["currency"] == "BYN")
 
-        # Обновляем категории доходов с реальными данными из транзакций
+        # Обновляем категории с реальными данными из транзакций
         for cat in categories:
             if cat["type"] == "Доход":
                 cat["spent"] = income_by_category.get(cat["name"], 0.0)
+            elif cat["type"] == "Расход":
+                # Берём расходы из транзакций, а не из формул
+                cat["spent"] = expense_by_category.get(cat["name"], 0.0)
+                # Пересчитываем остаток
+                if cat["budget"] > 0:
+                    cat["remaining"] = cat["budget"] - cat["spent"]
+                    cat["progress"] = cat["spent"] / cat["budget"] if cat["budget"] > 0 else 0
 
         # Категории с превышением бюджета
         over_budget = [
@@ -523,7 +616,7 @@ class GoogleSheetsService:
             return True
 
         except Exception as e:
-            print(f"Ошибка удаления транзакции: {e}")
+            logger.error(f"Ошибка удаления транзакции: {e}")
             return False
 
     @retry_on_error(max_retries=3, delay=1.0)
@@ -550,6 +643,11 @@ class GoogleSheetsService:
                     comment = row[6] if len(row) > 6 else ""
                     hours = safe_float(row[8]) if len(row) > 8 else 0
 
+                    # Получаем валюту и эквивалент в BYN
+                    currency = row[12].strip() if len(row) > 12 and row[12] else "BYN"
+                    amount_to = safe_float(row[11]) if len(row) > 11 and row[11] else amount
+                    amount_byn = amount_to if currency != "BYN" else amount
+
                     if day not in income_by_day:
                         income_by_day[day] = {
                             "total": 0,
@@ -560,19 +658,19 @@ class GoogleSheetsService:
                             "entries": []
                         }
 
-                    income_by_day[day]["total"] += amount
+                    income_by_day[day]["total"] += amount_byn
 
                     # Разделяем на зарплату, чаевые и другое
                     if category == "Чаевые":
-                        income_by_day[day]["tips"] += amount
+                        income_by_day[day]["tips"] += amount_byn
                         income_by_day[day]["hours"] += hours
                     elif category == "Зарплата":
-                        income_by_day[day]["salary"] += amount
+                        income_by_day[day]["salary"] += amount_byn
                     else:
-                        income_by_day[day]["other"] += amount
+                        income_by_day[day]["other"] += amount_byn
 
                     income_by_day[day]["entries"].append({
-                        "amount": amount,
+                        "amount": amount_byn,
                         "category": category,
                         "comment": comment,
                         "hours": hours
@@ -620,10 +718,17 @@ class GoogleSheetsService:
                 category = row[3].strip() if len(row) > 3 else ""  # Категория
                 amount = safe_float(row[4])  # Сумма
 
+                # Получаем валюту и эквивалент в BYN
+                currency = row[12].strip() if len(row) > 12 and row[12] else "BYN"
+                amount_to = safe_float(row[11]) if len(row) > 11 and row[11] else amount
+
+                # Если валюта не BYN, используем эквивалент
+                amount_byn = amount_to if currency != "BYN" else amount
+
                 # Считаем только расходы с указанного счета, исключая определенные категории
                 if trans_type == "Расход" and account == account_name:
                     if category not in exclude_categories:
-                        total_expenses += amount
+                        total_expenses += amount_byn
 
         return total_expenses
 

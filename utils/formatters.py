@@ -48,6 +48,9 @@ def format_balance_message(accounts: List[Dict[str, Any]]) -> str:
 
 def format_stats_message(data: Dict[str, Any]) -> str:
     """Форматировать статистику за месяц"""
+    import logging
+    logger = logging.getLogger(__name__)
+
     lines = [
         "📊 **СТАТИСТИКА ЗА МЕСЯЦ**\n",
         f"💰 Доходы: **{format_money(data['total_income'])}**",
@@ -58,6 +61,11 @@ def format_stats_message(data: Dict[str, Any]) -> str:
     # Группируем по типу
     income_cats = [c for c in data.get("categories", []) if c["type"] == "Доход"]
     expense_cats = [c for c in data.get("categories", []) if c["type"] == "Расход"]
+
+    # Отладка: логируем все категории расходов
+    logger.info(f"📊 Всего категорий расходов: {len(expense_cats)}")
+    for cat in expense_cats:
+        logger.info(f"  - {cat['name']}: spent={cat['spent']}, budget={cat['budget']}")
 
     # Доходы
     if income_cats:

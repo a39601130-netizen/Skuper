@@ -1,6 +1,7 @@
 """
 Состояния для ConversationHandler
 """
+import time
 from enum import IntEnum, auto
 
 class TransactionStates(IntEnum):
@@ -79,6 +80,7 @@ class TransactionData:
         self.exchange_rate: float = None  # Курс обмена
         self.amount_to: float = None      # Сумма зачисления
         self.currency: str = "BYN"        # Валюта операции
+        self.created_at: float = time.time()  # Время создания для очистки
 
     def to_dict(self):
         return {

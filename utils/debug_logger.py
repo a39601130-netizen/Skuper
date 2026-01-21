@@ -3,6 +3,7 @@
 Сохраняет подробную информацию об ошибках для последующего анализа
 """
 import logging
+from logging.handlers import RotatingFileHandler
 import json
 import traceback
 from datetime import datetime
@@ -104,11 +105,13 @@ bug_tracker = BugTracker()
 
 
 def setup_debug_logging():
-    """Настроить детальное логирование в файл"""
+    """Настроить детальное логирование в файл с ротацией"""
 
-    # Создаем файловый handler
-    file_handler = logging.FileHandler(
+    # Создаем RotatingFileHandler (макс 5MB, хранить 3 файла)
+    file_handler = RotatingFileHandler(
         DEBUG_LOG,
+        maxBytes=5*1024*1024,  # 5 MB
+        backupCount=3,
         encoding='utf-8'
     )
     file_handler.setLevel(logging.DEBUG)
@@ -123,7 +126,13 @@ def setup_debug_logging():
     # Добавляем к root logger
     root_logger = logging.getLogger()
     root_logger.addHandler(file_handler)
-    root_logger.setLevel(logging.DEBUG)
+    # Оставляем INFO для консоли, DEBUG только в файл
+    root_logger.setLevel(logging.INFO)
+
+    # Отключаем DEBUG логи от библиотек telegram и httpcore
+    logging.getLogger('telegram').setLevel(logging.WARNING)
+    logging.getLogger('httpx').setLevel(logging.WARNING)
+    logging.getLogger('httpcore').setLevel(logging.WARNING)
 
     logging.info("="*60)
     logging.info("БОТ ЗАПУЩЕН - Система отладки активирована")

@@ -2,6 +2,7 @@
 Обработчики транзакций
 """
 import logging
+import time
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 from datetime import datetime
@@ -26,8 +27,35 @@ logger = logging.getLogger(__name__)
 # Хранилище данных транзакций по user_id
 user_transactions = {}
 
+# Время жизни незавершённой транзакции (1 час)
+TRANSACTION_TTL = 3600
+
+
+def cleanup_old_transactions():
+    """Удалить устаревшие транзакции из памяти (старше 1 часа)"""
+    now = time.time()
+    expired = [
+        uid for uid, trans in user_transactions.items()
+        if now - trans.created_at > TRANSACTION_TTL
+    ]
+    for uid in expired:
+        del user_transactions[uid]
+    if expired:
+        logger.info(f"Очищено {len(expired)} устаревших транзакций")
+
+
+def clear_user_transaction(user_id: int):
+    """Полностью удалить данные транзакции пользователя"""
+    if user_id in user_transactions:
+        del user_transactions[user_id]
+
+
 def get_user_transaction(user_id: int) -> TransactionData:
     """Получить или создать данные транзакции для пользователя"""
+    # Периодически очищаем старые транзакции
+    if len(user_transactions) > 100:
+        cleanup_old_transactions()
+
     if user_id not in user_transactions:
         user_transactions[user_id] = TransactionData()
     return user_transactions[user_id]
@@ -365,14 +393,31 @@ async def select_account_callback(update: Update, context: ContextTypes.DEFAULT_
     if data.startswith("expense_"):
         account = data.replace("expense_", "")
         trans.account = account
-        trans.currency = "BYN"  # Всегда BYN для обычных расходов
+
+        # Определяем валюту счета
+        try:
+            sheets = get_sheets_service()
+            account_currency = sheets.get_account_currency(account)
+            trans.currency = account_currency
+
+            # Если валюта не BYN - получаем последний курс
+            if account_currency != "BYN":
+                last_rate = sheets.get_last_exchange_rate(account_currency)
+                if last_rate:
+                    trans.exchange_rate = last_rate
+                    logger.info(f"Автоматически подставлен курс {account_currency}: {last_rate}")
+        except Exception as e:
+            logger.warning(f"Ошибка определения валюты счета: {e}")
+            trans.currency = "BYN"
 
         day_str = f" (📅 {trans.day} число)" if trans.day else ""
+        currency_info = f" ({trans.currency})" if trans.currency != "BYN" else ""
+
         await query.edit_message_text(
             f"💸 **Расход**{day_str}\n"
             f"📁 Категория: {trans.category}\n"
-            f"💳 Счёт: {account}\n\n"
-            f"💵 Введи сумму:",
+            f"💳 Счёт: {account}{currency_info}\n\n"
+            f"💵 Введи сумму{currency_info}:",
             parse_mode="Markdown"
         )
         return TransactionStates.ENTER_AMOUNT
@@ -526,6 +571,18 @@ async def enter_exchange_rate(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Обработка ввода курса обмена"""
     user_id = update.effective_user.id
     trans = get_user_transaction(user_id)
+
+    # Если пользователь подтвердил автоматический курс через /skip
+    if update.message.text.strip() == "/skip":
+        # Курс уже установлен и amount_to рассчитан - переходим к комментарию
+        if trans.trans_type == "Расход" and trans.exchange_rate and trans.amount_to:
+            await update.message.reply_text(
+                f"✅ Используем курс: **{trans.exchange_rate}**\n"
+                f"💰 Эквивалент: **{trans.amount_to:.2f}** BYN\n\n"
+                "💬 Добавь комментарий (или /skip):",
+                parse_mode="Markdown"
+            )
+            return TransactionStates.ENTER_COMMENT
 
     try:
         rate_text = update.message.text.replace(",", ".").strip()
@@ -758,16 +815,34 @@ async def enter_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return TransactionStates.ENTER_EXCHANGE_RATE
 
-        # Для расхода в иностранной валюте - спрашиваем курс
+        # Для расхода в иностранной валюте
         if trans.trans_type == "Расход" and trans.currency != "BYN":
-            await update.message.reply_text(
-                f"💸 **Расход в {trans.currency}**\n"
-                f"💵 Сумма: **{amount}** {trans.currency}\n\n"
-                f"📊 Введи текущий курс {trans.currency}/BYN:\n"
-                f"(для расчёта суммы в BYN)",
-                parse_mode="Markdown"
-            )
-            return TransactionStates.ENTER_EXCHANGE_RATE
+            # Если курс уже получен автоматически - показываем его
+            if trans.exchange_rate and trans.exchange_rate > 0:
+                # Рассчитываем эквивалент в BYN
+                amount_byn = amount * trans.exchange_rate
+                trans.amount_to = amount_byn
+
+                await update.message.reply_text(
+                    f"💸 **Расход в {trans.currency}**\n"
+                    f"💵 Сумма: **{amount}** {trans.currency}\n"
+                    f"📊 Курс: **{trans.exchange_rate}** (последний)\n"
+                    f"💰 Эквивалент: **{amount_byn:.2f}** BYN\n\n"
+                    f"✅ Курс верный? Отправь `/skip` чтобы продолжить\n"
+                    f"✏️ Или введи новый курс {trans.currency}/BYN:",
+                    parse_mode="Markdown"
+                )
+                return TransactionStates.ENTER_EXCHANGE_RATE
+            else:
+                # Курса нет - просим ввести
+                await update.message.reply_text(
+                    f"💸 **Расход в {trans.currency}**\n"
+                    f"💵 Сумма: **{amount}** {trans.currency}\n\n"
+                    f"📊 Введи текущий курс {trans.currency}/BYN:\n"
+                    f"(для расчёта суммы в BYN)",
+                    parse_mode="Markdown"
+                )
+                return TransactionStates.ENTER_EXCHANGE_RATE
 
         # Для расхода в BYN и перевода - к комментарию
         await update.message.reply_text(

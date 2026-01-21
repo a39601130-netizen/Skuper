@@ -5,6 +5,11 @@ Telegram бот для управления финансами и трениро
 Запуск: python main.py
 """
 import logging
+import os
+import sys
+import atexit
+import warnings
+from pathlib import Path
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -15,6 +20,10 @@ from telegram.ext import (
     filters
 )
 from telegram.error import BadRequest, NetworkError, TimedOut
+
+# Подавляем предупреждение PTBUserWarning о per_message для CallbackQueryHandler
+# Это ожидаемое поведение для callback-based разговоров
+warnings.filterwarnings("ignore", message=".*per_message.*CallbackQueryHandler.*")
 
 import config
 from utils.debug_logger import setup_debug_logging, bug_tracker, log_conversation_state
@@ -137,6 +146,32 @@ logger = logging.getLogger(__name__)
 # ОБРАБОТЧИКИ МЕНЮ
 # ============================================
 
+async def cancel_conversation_fallback(update: Update, context):
+    """Универсальный fallback для выхода из любого диалога при навигации"""
+    from telegram.ext import ConversationHandler
+
+    query = update.callback_query
+
+    # Очищаем данные транзакций
+    user_id = update.effective_user.id
+    from bot.handlers.transactions import user_transactions
+    if user_id in user_transactions:
+        user_transactions[user_id].reset()
+
+    # Очищаем данные тренировок
+    context.user_data.pop('workout', None)
+
+    # Очищаем другие флаги
+    context.user_data.pop('in_conversation', None)
+    context.user_data.pop('waiting_advisor_question', None)
+
+    # Показываем меню
+    await menu_callback(update, context)
+
+    # Завершаем conversation
+    return ConversationHandler.END
+
+
 async def menu_callback(update: Update, context):
     """Обработчик главного меню и модулей"""
     query = update.callback_query
@@ -241,12 +276,8 @@ async def handle_text(update: Update, context):
 
     text = update.message.text.lower()
 
-    # Проверяем, есть ли активный диалог
+    # Проверяем, идёт ли тренировка (ConversationHandler блокирует автоматически)
     user_data = context.user_data
-    if user_data.get('in_conversation'):
-        return
-
-    # Проверяем, идёт ли тренировка
     if user_data.get('workout'):
         return
 
@@ -335,12 +366,63 @@ async def error_handler(update: object, context):
                     "❌ Произошла ошибка. Попробуй /start для перезапуска.",
                     reply_markup=get_main_menu()
                 )
-            except:
-                pass
+            except Exception as send_error:
+                logger.warning(f"Не удалось отправить сообщение об ошибке: {send_error}")
 
     except Exception as e:
         logger.error(f"Ошибка в error_handler: {e}")
 
+
+# ============================================
+# БЛОКИРОВКА МНОЖЕСТВЕННОГО ЗАПУСКА
+# ============================================
+
+LOCK_FILE = Path(__file__).parent / "bot.lock"
+
+def acquire_lock():
+    """Создает файл блокировки для предотвращения множественного запуска"""
+    if LOCK_FILE.exists():
+        try:
+            with open(LOCK_FILE, 'r') as f:
+                pid = int(f.read().strip())
+
+            # Проверяем, существует ли процесс
+            if sys.platform == 'win32':
+                import subprocess
+                result = subprocess.run(['tasklist', '/FI', f'PID eq {pid}'],
+                                      capture_output=True, text=True)
+                if str(pid) in result.stdout:
+                    logger.error(f"❌ Бот уже запущен (PID: {pid})")
+                    logger.error("Завершите предыдущий экземпляр или удалите bot.lock")
+                    sys.exit(1)
+            else:
+                try:
+                    os.kill(pid, 0)
+                    logger.error(f"❌ Бот уже запущен (PID: {pid})")
+                    logger.error("Завершите предыдущий экземпляр или удалите bot.lock")
+                    sys.exit(1)
+                except OSError:
+                    pass  # Процесс не существует
+
+            # Старый PID не существует, удаляем файл
+            LOCK_FILE.unlink()
+        except (ValueError, FileNotFoundError):
+            LOCK_FILE.unlink()
+
+    # Создаем новый файл блокировки
+    with open(LOCK_FILE, 'w') as f:
+        f.write(str(os.getpid()))
+
+    logger.info(f"🔒 Блокировка создана (PID: {os.getpid()})")
+
+def release_lock():
+    """Удаляет файл блокировки при завершении"""
+    try:
+        if LOCK_FILE.exists():
+            LOCK_FILE.unlink()
+            logger.info("🔓 Блокировка снята")
+    except Exception as e:
+        logger.warning(f"Не удалось удалить файл блокировки: {e}")
 
 # ============================================
 # ГЛАВНАЯ ФУНКЦИЯ
@@ -350,6 +432,10 @@ def main():
     """Запуск бота"""
 
     setup_debug_logging()
+
+    # Проверяем и создаем блокировку
+    acquire_lock()
+    atexit.register(release_lock)
 
     if not config.TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN не задан в .env файле!")
@@ -417,7 +503,8 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_amount)
             ],
             TransactionStates.ENTER_EXCHANGE_RATE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_exchange_rate)
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_exchange_rate),
+                CommandHandler("skip", enter_exchange_rate)
             ],
             TransactionStates.ENTER_AMOUNT_TO: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_amount_to)
@@ -437,7 +524,7 @@ def main():
         fallbacks=[
             CommandHandler("cancel", cancel),
             CallbackQueryHandler(menu_add_callback, pattern="^(menu_add|finance_add)$"),
-            CallbackQueryHandler(menu_callback, pattern="^(menu_|module_)")
+            CallbackQueryHandler(cancel_conversation_fallback, pattern="^(menu_|module_|finance_|advisor_|workout_)")
         ],
         per_message=False,
         per_user=True,
@@ -459,9 +546,14 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, advisor_question)
             ]
         },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CallbackQueryHandler(cancel_conversation_fallback, pattern="^(menu_|module_|finance_|workout_)")
+        ],
+        per_message=False,
         per_user=True,
-        per_chat=True
+        per_chat=True,
+        conversation_timeout=300  # 5 минут на ввод вопроса
     )
     application.add_handler(advisor_conv_handler, group=0)
 
@@ -534,6 +626,7 @@ def main():
         fallbacks=[
             CallbackQueryHandler(workout_cancel_callback, pattern="^workout_cancel$"),
             CommandHandler("cancel", workout_cancel_callback),
+            CallbackQueryHandler(cancel_conversation_fallback, pattern="^(menu_|module_|finance_|advisor_)")
         ],
         per_message=False,
         per_user=True,

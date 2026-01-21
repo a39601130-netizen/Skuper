@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv
+.venv
+*.egg-info
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Логи (создадим заново)
+logs/*.log
+logs/*.json
+
+# Документация разработки
+docs/
+*.md
+!README.md
+
+# Локальные файлы
+.env
+google_credentials.json
+bot.lock
+*.bat
+
+# Claude Code
+.claude
+
+# Тесты
+test_*.py
+debug_*.py

@@ -1,0 +1,24 @@
+[Unit]
+Description=Budget Bot - Telegram бот для финансов и тренировок
+After=network.target
+
+[Service]
+Type=simple
+User=budget_bot
+Group=budget_bot
+WorkingDirectory=/opt/budget_bot
+Environment=PATH=/opt/budget_bot/venv/bin
+ExecStart=/opt/budget_bot/venv/bin/python main.py
+Restart=always
+RestartSec=10
+
+# Логирование
+StandardOutput=append:/opt/budget_bot/logs/stdout.log
+StandardError=append:/opt/budget_bot/logs/stderr.log
+
+# Безопасность
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

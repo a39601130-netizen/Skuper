@@ -141,4 +141,65 @@ life_manager_bot/
 
 ---
 
+## 🚀 Деплой на сервер
+
+### Docker (рекомендуется)
+
+```bash
+# 1. Скопировать проект на сервер
+scp -r budget_bot user@server:/opt/
+
+# 2. Создать .env файл
+cd /opt/budget_bot
+cp .env.example .env
+nano .env  # Заполнить данные
+
+# 3. Скопировать google_credentials.json
+scp google_credentials.json user@server:/opt/budget_bot/
+
+# 4. Запустить
+docker-compose up -d
+
+# Логи
+docker-compose logs -f
+
+# Перезапуск
+docker-compose restart
+
+# Остановка
+docker-compose down
+```
+
+### Systemd (без Docker)
+
+```bash
+# 1. Создать пользователя
+sudo useradd -r -s /bin/false budget_bot
+
+# 2. Установить проект
+sudo mkdir /opt/budget_bot
+sudo cp -r * /opt/budget_bot/
+sudo chown -R budget_bot:budget_bot /opt/budget_bot
+
+# 3. Виртуальное окружение
+cd /opt/budget_bot
+python3 -m venv venv
+./venv/bin/pip install -r requirements.txt
+
+# 4. Настроить .env
+sudo -u budget_bot cp .env.example .env
+sudo -u budget_bot nano .env
+
+# 5. Установить сервис
+sudo cp budget_bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable budget_bot
+sudo systemctl start budget_bot
+
+# Логи
+sudo journalctl -u budget_bot -f
+```
+
+---
+
 *Создано с 💚 Январь 2025*
