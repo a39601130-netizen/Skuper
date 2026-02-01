@@ -3,7 +3,7 @@
 """
 import logging
 import time
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from datetime import datetime
 from utils.debug_logger import bug_tracker, log_conversation_state
@@ -506,20 +506,28 @@ async def select_to_account_callback(update: Update, context: ContextTypes.DEFAU
         )
         return TransactionStates.ENTER_AMOUNT
 
-    # Для обмена валюты - после выбора счета спрашиваем валюту списания
+    # Для обмена валюты - автоопределяем валюту и переходим к вводу суммы
     if data.startswith("exchange_to_"):
         to_account = data.replace("exchange_to_", "")
         trans.to_account = to_account
 
+        # Автоопределение валюты счёта списания
+        try:
+            sheets = get_sheets_service()
+            from_currency = sheets.get_account_currency(trans.account)
+            trans.currency = from_currency
+        except Exception:
+            trans.currency = "BYN"
+
         await query.edit_message_text(
             f"💱 **Обмен валюты**\n"
             f"📤 С: {trans.account}\n"
-            f"📥 На: {to_account}\n\n"
-            f"🏦 Выбери валюту списания:",
-            parse_mode="Markdown",
-            reply_markup=get_currency_keyboard()
+            f"📥 На: {to_account}\n"
+            f"🏦 Валюта: {trans.currency}\n\n"
+            f"💵 Введи сумму списания ({trans.currency}):",
+            parse_mode="Markdown"
         )
-        return TransactionStates.SELECT_CURRENCY
+        return TransactionStates.ENTER_AMOUNT
 
     return TransactionStates.SELECT_TO_ACCOUNT
 
@@ -609,16 +617,27 @@ async def enter_exchange_rate(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return TransactionStates.ENTER_COMMENT
 
-        # Для ОБМЕНА валюты - спрашиваем сумму зачисления
-        to_currency = trans._get_to_currency()
+        # Для ОБМЕНА валюты - рассчитываем сумму зачисления автоматически
+        try:
+            sheets = get_sheets_service()
+            to_currency = sheets.get_account_currency(trans.to_account)
+        except Exception:
+            to_currency = "BYN"
+
+        calculated_amount = round(trans.amount / rate, 2)
+        trans.amount_to = calculated_amount
 
         await update.message.reply_text(
             f"💱 **Обмен валюты**\n"
             f"📤 С: {trans.account} ({trans.amount} {trans.currency})\n"
             f"📥 На: {trans.to_account}\n"
-            f"📊 Курс: {rate}\n\n"
-            f"💵 Введи сумму зачисления ({to_currency}):",
-            parse_mode="Markdown"
+            f"📊 Курс: {rate}\n"
+            f"💵 Сумма зачисления: **{calculated_amount}** {to_currency}\n\n"
+            f"✅ Нажми **Подтвердить** или введи свою сумму:",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ Подтвердить", callback_data="confirm_amount_to")]
+            ])
         )
         return TransactionStates.ENTER_AMOUNT_TO
 
@@ -630,10 +649,50 @@ async def enter_exchange_rate(update: Update, context: ContextTypes.DEFAULT_TYPE
         return TransactionStates.ENTER_EXCHANGE_RATE
 
 
+async def confirm_amount_to_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Подтверждение автоматически рассчитанной суммы зачисления (кнопка)"""
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    trans = get_user_transaction(user_id)
+
+    if not trans or not trans.amount_to:
+        await query.edit_message_text("❌ Данные транзакции не найдены. Начни заново.")
+        return ConversationHandler.END
+
+    try:
+        sheets = get_sheets_service()
+        to_currency = sheets.get_account_currency(trans.to_account)
+    except Exception:
+        to_currency = "BYN"
+
+    await query.edit_message_text(
+        f"💵 Сумма зачисления: **{trans.amount_to}** {to_currency}\n\n"
+        "💬 Добавь комментарий (или /skip):",
+        parse_mode="Markdown"
+    )
+    return TransactionStates.ENTER_COMMENT
+
+
 async def enter_amount_to(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ввода суммы зачисления"""
     user_id = update.effective_user.id
     trans = get_user_transaction(user_id)
+
+    # Если /skip — используем автоматически рассчитанную сумму
+    if update.message.text.strip() == "/skip" and trans.amount_to:
+        try:
+            sheets = get_sheets_service()
+            to_currency = sheets.get_account_currency(trans.to_account)
+        except Exception:
+            to_currency = "BYN"
+
+        await update.message.reply_text(
+            f"💵 Сумма зачисления: **{trans.amount_to}** {to_currency}\n\n"
+            "💬 Добавь комментарий (или /skip):",
+            parse_mode="Markdown"
+        )
+        return TransactionStates.ENTER_COMMENT
 
     try:
         amount_text = update.message.text.replace(",", ".").strip()

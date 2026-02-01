@@ -1,9 +1,12 @@
 """
 Утилиты для форматирования сообщений
 """
+import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 import re
+
+logger = logging.getLogger(__name__)
 
 def format_money(amount: float, currency: str = "BYN") -> str:
     """Форматировать денежную сумму"""
@@ -48,9 +51,6 @@ def format_balance_message(accounts: List[Dict[str, Any]]) -> str:
 
 def format_stats_message(data: Dict[str, Any]) -> str:
     """Форматировать статистику за месяц"""
-    import logging
-    logger = logging.getLogger(__name__)
-
     lines = [
         "📊 **СТАТИСТИКА ЗА МЕСЯЦ**\n",
         f"💰 Доходы: **{format_money(data['total_income'])}**",

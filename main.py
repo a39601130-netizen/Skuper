@@ -59,6 +59,7 @@ from bot.handlers.transactions import (
     enter_hours,
     enter_exchange_rate,
     enter_amount_to,
+    confirm_amount_to_callback,
     confirm_callback,
     cancel
 )
@@ -507,7 +508,9 @@ def main():
                 CommandHandler("skip", enter_exchange_rate)
             ],
             TransactionStates.ENTER_AMOUNT_TO: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_amount_to)
+                CallbackQueryHandler(confirm_amount_to_callback, pattern="^confirm_amount_to$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_amount_to),
+                CommandHandler("skip", enter_amount_to)
             ],
             TransactionStates.ENTER_COMMENT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_comment),

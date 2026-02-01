@@ -32,7 +32,7 @@ class BugTracker:
             try:
                 with open(BUGS_LOG, 'r', encoding='utf-8') as f:
                     self.bugs = json.load(f)
-            except:
+            except (json.JSONDecodeError, FileNotFoundError, OSError):
                 self.bugs = []
 
     def _save_bugs(self):

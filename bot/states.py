@@ -142,11 +142,17 @@ class TransactionData:
         """Определить валюту счёта зачисления"""
         if not self.to_account:
             return "BYN"
-        acc_upper = self.to_account.upper()
-        if "USD" in acc_upper or "ДОЛЛАР" in acc_upper:
-            return "USD"
-        if "EUR" in acc_upper or "ЕВРО" in acc_upper:
-            return "EUR"
-        if "RUB" in acc_upper or "РУБЛ" in acc_upper:
-            return "RUB"
-        return "BYN"
+        try:
+            from services.sheets import get_sheets_service
+            sheets = get_sheets_service()
+            return sheets.get_account_currency(self.to_account)
+        except Exception:
+            # Фоллбэк по имени счёта
+            acc_upper = self.to_account.upper()
+            if "USD" in acc_upper or "ДОЛЛАР" in acc_upper:
+                return "USD"
+            if "EUR" in acc_upper or "ЕВРО" in acc_upper:
+                return "EUR"
+            if "RUB" in acc_upper or "РУБЛ" in acc_upper:
+                return "RUB"
+            return "BYN"
