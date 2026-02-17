@@ -62,11 +62,6 @@ def format_stats_message(data: Dict[str, Any]) -> str:
     income_cats = [c for c in data.get("categories", []) if c["type"] == "Доход"]
     expense_cats = [c for c in data.get("categories", []) if c["type"] == "Расход"]
 
-    # Отладка: логируем все категории расходов
-    logger.info(f"📊 Всего категорий расходов: {len(expense_cats)}")
-    for cat in expense_cats:
-        logger.info(f"  - {cat['name']}: spent={cat['spent']}, budget={cat['budget']}")
-
     # Доходы
     if income_cats:
         lines.append("\n💰 **Доходы:**")
@@ -168,12 +163,15 @@ def format_transaction_success(
 
     # Для обмена валюты показываем детали
     if trans_type == "Обмен валюты" and amount_to and exchange_rate:
-        # Определяем валюту зачисления по счёту
-        to_currency = "USD" if to_account and "USD" in to_account.upper() else "BYN"
-        if to_account and "EUR" in to_account.upper():
-            to_currency = "EUR"
-        if to_account and "RUB" in to_account.upper():
-            to_currency = "RUB"
+        # Определяем валюту зачисления через API
+        to_currency = "BYN"
+        if to_account:
+            try:
+                from services.sheets import get_sheets_service
+                sheets = get_sheets_service()
+                to_currency = sheets.get_account_currency(to_account)
+            except Exception:
+                pass
         lines.append(f"💵 Получено: **{format_money(amount_to, to_currency)}**")
         lines.append(f"📊 Курс: {exchange_rate:.4f}")
 
@@ -505,6 +503,10 @@ def format_weekly_report(data: Dict[str, Any]) -> str:
         "📊 **ОТЧЕТ ЗА НЕДЕЛЮ**",
         f"📅 {data['start_day']}-{data['end_day']} число\n"
     ]
+
+    # Предупреждение если данные обрезаны началом месяца
+    if data.get('truncated'):
+        lines.append("⚠️ _Неполная неделя (начало месяца)_\n")
 
     # Общая сводка
     balance = data['balance']

@@ -360,12 +360,18 @@ async def start_rest_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, s
     # Запускаем обратный отсчёт
     context.user_data['workout']['timer_message_id'] = msg.message_id
     context.user_data['workout']['timer_seconds'] = seconds
-    
-    # Создаём задачу таймера
-    asyncio.create_task(
+
+    # Отменяем предыдущий таймер если есть
+    old_task = context.user_data['workout'].get('timer_task')
+    if old_task and not old_task.done():
+        old_task.cancel()
+
+    # Создаём задачу таймера и сохраняем ссылку
+    task = asyncio.create_task(
         _run_timer(update, context, seconds, msg.chat_id, msg.message_id)
     )
-    
+    context.user_data['workout']['timer_task'] = task
+
     return WorkoutStates.REST_TIMER
 
 

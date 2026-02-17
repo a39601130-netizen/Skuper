@@ -22,6 +22,8 @@ BUGS_LOG = LOGS_DIR / "bugs.json"
 class BugTracker:
     """Трекер багов с сохранением контекста"""
 
+    MAX_BUGS = 200  # Максимум записей в файле
+
     def __init__(self):
         self.bugs = []
         self._load_bugs()
@@ -56,6 +58,16 @@ class BugTracker:
             user_id: ID пользователя
             handler: Название обработчика где произошла ошибка
         """
+        # Безопасная сериализация контекста
+        safe_context = {}
+        if context:
+            for key, value in context.items():
+                try:
+                    json.dumps(value, ensure_ascii=False)
+                    safe_context[key] = value
+                except (TypeError, ValueError):
+                    safe_context[key] = str(value)
+
         bug_entry = {
             "timestamp": datetime.now().isoformat(),
             "error_type": type(error).__name__,
@@ -63,11 +75,16 @@ class BugTracker:
             "traceback": traceback.format_exc(),
             "user_id": user_id,
             "handler": handler,
-            "context": context or {},
+            "context": safe_context,
             "resolved": False
         }
 
         self.bugs.append(bug_entry)
+
+        # Ограничиваем размер - оставляем только последние MAX_BUGS записей
+        if len(self.bugs) > self.MAX_BUGS:
+            self.bugs = self.bugs[-self.MAX_BUGS:]
+
         self._save_bugs()
 
         # Логируем в файл
@@ -78,7 +95,7 @@ class BugTracker:
             f"Обработчик: {handler}\n"
             f"Пользователь: {user_id}\n"
             f"Ошибка: {error}\n"
-            f"Контекст: {json.dumps(context, ensure_ascii=False, indent=2)}\n"
+            f"Контекст: {json.dumps(safe_context, ensure_ascii=False, indent=2)}\n"
             f"Traceback:\n{bug_entry['traceback']}\n"
             f"{'='*60}\n"
         )

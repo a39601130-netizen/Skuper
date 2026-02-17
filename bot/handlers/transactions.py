@@ -191,7 +191,12 @@ async def select_type_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         return ConversationHandler.END
 
     except Exception as e:
-        bug_tracker.log_bug(e, {"trans_data": trans.to_dict() if 'trans' in dir() else None}, user_id, "select_type_callback")
+        trans_data = None
+        try:
+            trans_data = trans.to_dict()
+        except Exception:
+            pass
+        bug_tracker.log_bug(e, {"trans_data": trans_data}, user_id, "select_type_callback")
         try:
             await query.edit_message_text("❌ Ошибка. Попробуй /add снова.", reply_markup=get_main_menu())
         except Exception:
@@ -231,9 +236,14 @@ async def select_date_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         return TransactionStates.SELECT_DATE
 
     except Exception as e:
+        trans_data = None
+        try:
+            trans_data = trans.to_dict()
+        except Exception:
+            pass
         bug_tracker.log_bug(e, {
-            "trans_data": trans.to_dict() if 'trans' in dir() and trans else None,
-            "callback_data": data if 'data' in dir() else None
+            "trans_data": trans_data,
+            "callback_data": locals().get('data')
         }, user_id, "select_date_callback")
         try:
             await query.edit_message_text("❌ Ошибка. Попробуй /add снова.", reply_markup=get_main_menu())
@@ -242,136 +252,90 @@ async def select_date_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         return ConversationHandler.END
 
 
-async def proceed_after_date(query, trans, day):
-    """Переход к следующему шагу после выбора даты"""
+def _build_after_date_data(trans, day):
+    """Подготовить данные для перехода после выбора даты (общая логика)"""
+    emoji_map = {"Расход": "💸", "Доход": "💰", "Перевод": "🔄", "Обмен валюты": "💱"}
+    emoji = emoji_map.get(trans.trans_type, "📝")
 
     if trans.trans_type == "Расход":
-        await query.edit_message_text(
-            f"💸 **Расход** (📅 {day} число)\n\nВыбери категорию:",
-            parse_mode="Markdown",
-            reply_markup=get_quick_expense_keyboard()
-        )
-        return TransactionStates.SELECT_CATEGORY
+        return {
+            "text": f"{emoji} **Расход** (📅 {day} число)\n\nВыбери категорию:",
+            "keyboard": get_quick_expense_keyboard(),
+            "state": TransactionStates.SELECT_CATEGORY
+        }
 
-    elif trans.trans_type == "Доход":
-        # Для дохода сначала выбираем счет
-        try:
-            sheets = get_sheets_service()
-            refs = sheets.get_references()
-            accounts = refs["accounts"]
-        except Exception as e:
-            logger.warning(f"Не удалось загрузить счета: {e}")
-            accounts = ["Наличные", "Карта", "Карта Сбер"]
+    # Для остальных типов нужны счета
+    try:
+        sheets = get_sheets_service()
+        refs = sheets.get_references()
+        accounts = refs["accounts"]
+    except Exception as e:
+        logger.warning(f"Не удалось загрузить счета: {e}")
+        accounts = ["Наличные", "Карта", "Карта Сбер"]
 
-        await query.edit_message_text(
-            f"💰 **Доход** (📅 {day} число)\n\n💳 На какой счет зачислить?",
-            parse_mode="Markdown",
-            reply_markup=get_accounts_keyboard(accounts, "income")
-        )
-        return TransactionStates.SELECT_ACCOUNT
-
+    if trans.trans_type == "Доход":
+        return {
+            "text": f"{emoji} **Доход** (📅 {day} число)\n\n💳 На какой счет зачислить?",
+            "keyboard": get_accounts_keyboard(accounts, "income"),
+            "state": TransactionStates.SELECT_ACCOUNT
+        }
     elif trans.trans_type == "Перевод":
-        try:
-            sheets = get_sheets_service()
-            refs = sheets.get_references()
-            accounts = refs["accounts"]
-        except Exception as e:
-            logger.warning(f"Не удалось загрузить счета: {e}")
-            accounts = ["Наличные", "Карта", "Карта Сбер"]
-
-        await query.edit_message_text(
-            f"🔄 **Перевод** (📅 {day} число)\n\n💳 С какого счета списать?",
-            parse_mode="Markdown",
-            reply_markup=get_accounts_keyboard(accounts, "from")
-        )
-        return TransactionStates.SELECT_ACCOUNT
-
+        return {
+            "text": f"{emoji} **Перевод** (📅 {day} число)\n\n💳 С какого счета списать?",
+            "keyboard": get_accounts_keyboard(accounts, "from"),
+            "state": TransactionStates.SELECT_ACCOUNT
+        }
     elif trans.trans_type == "Обмен валюты":
-        try:
-            sheets = get_sheets_service()
-            refs = sheets.get_references()
-            accounts = refs["accounts"]
-        except Exception as e:
-            logger.warning(f"Не удалось загрузить счета: {e}")
-            accounts = ["Наличные", "Карта", "Карта Сбер"]
+        return {
+            "text": f"{emoji} **Обмен валюты** (📅 {day} число)\n\n💳 С какого счета списать?",
+            "keyboard": get_accounts_keyboard(accounts, "exchange_from"),
+            "state": TransactionStates.SELECT_ACCOUNT
+        }
 
-        await query.edit_message_text(
-            f"💱 **Обмен валюты** (📅 {day} число)\n\n💳 С какого счета списать?",
-            parse_mode="Markdown",
-            reply_markup=get_accounts_keyboard(accounts, "exchange_from")
-        )
-        return TransactionStates.SELECT_ACCOUNT
+    return None
+
+
+async def proceed_after_date(query, trans, day):
+    """Переход к следующему шагу после выбора даты (callback query)"""
+    data = _build_after_date_data(trans, day)
+    if not data:
+        return TransactionStates.SELECT_DATE
+
+    await query.edit_message_text(
+        data["text"],
+        parse_mode="Markdown",
+        reply_markup=data["keyboard"]
+    )
+    return data["state"]
+
+
+async def proceed_after_date_message(update, trans, day):
+    """Переход к следующему шагу после выбора даты (текстовое сообщение)"""
+    data = _build_after_date_data(trans, day)
+    if not data:
+        return TransactionStates.SELECT_DATE
+
+    await update.message.reply_text(
+        data["text"],
+        parse_mode="Markdown",
+        reply_markup=data["keyboard"]
+    )
+    return data["state"]
 
 
 async def enter_custom_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ввода произвольной даты"""
     user_id = update.effective_user.id
     trans = get_user_transaction(user_id)
-    
+
     try:
         day = int(update.message.text.strip())
         if day < 1 or day > 31:
             await update.message.reply_text("❌ День должен быть от 1 до 31!")
             return TransactionStates.SELECT_DATE
-        
+
         trans.day = day
-        
-        if trans.trans_type == "Расход":
-            await update.message.reply_text(
-                f"💸 **Расход** (📅 {day} число)\n\nВыбери категорию:",
-                parse_mode="Markdown",
-                reply_markup=get_quick_expense_keyboard()
-            )
-            return TransactionStates.SELECT_CATEGORY
-            
-        elif trans.trans_type == "Доход":
-            # Для дохода сначала выбираем счет
-            try:
-                sheets = get_sheets_service()
-                refs = sheets.get_references()
-                accounts = refs["accounts"]
-            except Exception as e:
-                logger.warning(f"Не удалось загрузить счета: {e}")
-                accounts = ["Наличные", "Карта", "Карта Сбер"]
-
-            await update.message.reply_text(
-                f"💰 **Доход** (📅 {day} число)\n\n💳 На какой счет зачислить?",
-                parse_mode="Markdown",
-                reply_markup=get_accounts_keyboard(accounts, "income")
-            )
-            return TransactionStates.SELECT_ACCOUNT
-            
-        elif trans.trans_type == "Перевод":
-            try:
-                sheets = get_sheets_service()
-                refs = sheets.get_references()
-                accounts = refs["accounts"]
-            except Exception as e:
-                logger.warning(f"Не удалось загрузить счета: {e}")
-                accounts = ["Наличные", "Карта", "Карта Сбер"]
-
-            await update.message.reply_text(
-                f"🔄 **Перевод** (📅 {day} число)\n\n💳 С какого счета списать?",
-                parse_mode="Markdown",
-                reply_markup=get_accounts_keyboard(accounts, "from")
-            )
-            return TransactionStates.SELECT_ACCOUNT
-
-        elif trans.trans_type == "Обмен валюты":
-            try:
-                sheets = get_sheets_service()
-                refs = sheets.get_references()
-                accounts = refs["accounts"]
-            except Exception as e:
-                logger.warning(f"Не удалось загрузить счета: {e}")
-                accounts = ["Наличные", "Карта", "Карта Сбер"]
-
-            await update.message.reply_text(
-                f"💱 **Обмен валюты** (📅 {day} число)\n\n💳 С какого счета списать?",
-                parse_mode="Markdown",
-                reply_markup=get_accounts_keyboard(accounts, "exchange_from")
-            )
-            return TransactionStates.SELECT_ACCOUNT
+        return await proceed_after_date_message(update, trans, day)
 
     except ValueError:
         await update.message.reply_text("❌ Введи число от 1 до 31!")

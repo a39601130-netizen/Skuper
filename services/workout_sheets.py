@@ -297,13 +297,13 @@ class WorkoutSheetsService(BaseSheetsService):
     
     def get_current_week_and_phase(self) -> Dict:
         """Определить текущую неделю и фазу программы"""
-        history = self.get_workout_history(limit=20)
-        
-        if not history:
+        all_workouts = self._get_workouts_cached()
+
+        if not all_workouts:
             return {'week': 1, 'phase': 'intro', 'phase_name': 'Знакомство'}
-        
-        # Считаем количество тренировок
-        total_workouts = len(history)
+
+        # Считаем ВСЕ тренировки, а не только последние 20
+        total_workouts = len(all_workouts)
         
         # 2 тренировки в неделю
         week = (total_workouts // 2) + 1

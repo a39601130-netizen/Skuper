@@ -256,7 +256,8 @@ async def back_pain_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     pain = int(query.data.split('_')[1])
     context.user_data['workout']['back_pain'] = pain
 
-    # Если боль высокая - предупреждение
+    # Если боль высокая - добавляем предупреждение AI в текст выбора дня
+    warning_text = ""
     if pain >= config.AI_TRIGGERS['back_pain_threshold']:
         advisor = get_advisor()
         warning = await advisor.ask(
@@ -264,13 +265,10 @@ async def back_pain_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"Боль в спине: {pain}/10",
             mode="brief"
         )
-        await query.edit_message_text(
-            f"⚠️ **Внимание: боль в спине {pain}/10**\n\n{warning}",
-            parse_mode="Markdown"
-        )
+        warning_text = f"⚠️ **Внимание: боль в спине {pain}/10**\n{warning}\n\n"
 
     # Предлагаем выбрать день тренировки
-    text = """🏋️ **Выбери день тренировки:**
+    text = f"""{warning_text}🏋️ **Выбери день тренировки:**
 
 🔵 **День A** (Горизонтальный акцент):
 Приседания, жим лёжа, тяга, румынская тяга
@@ -485,12 +483,18 @@ async def workout_cancel_callback(update: Update, context: ContextTypes.DEFAULT_
     """Отмена тренировки"""
     query = update.callback_query
     await query.answer()
-    
+
+    # Отменяем активный таймер если есть
+    workout_data = context.user_data.get('workout', {})
+    timer_task = workout_data.get('timer_task')
+    if timer_task and not timer_task.done():
+        timer_task.cancel()
+
     context.user_data.pop('workout', None)
-    
+
     await query.edit_message_text(
         "❌ Тренировка отменена",
         reply_markup=get_workout_menu()
     )
-    
+
     return ConversationHandler.END

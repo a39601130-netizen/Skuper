@@ -157,16 +157,6 @@ async def advisor_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-async def handle_advisor_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка текста когда ожидается вопрос AI"""
-    
-    # Проверяем, ждём ли мы вопрос для AI
-    if context.user_data.get('waiting_advisor_question'):
-        return await advisor_question(update, context)
-    
-    return None  # Не обрабатываем
-
-
 async def ask_advisor_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало диалога с AI советником"""
     

@@ -50,8 +50,8 @@ def safe_float(value, default=0.0) -> float:
         return float(value)
     
     try:
-        # Убираем пробелы и заменяем запятую на точку
-        cleaned = str(value).strip().replace(" ", "").replace(",", ".")
+        # Убираем пробелы (включая неразрывный \u00A0) и заменяем запятую на точку
+        cleaned = str(value).strip().replace("\u00A0", "").replace(" ", "").replace(",", ".")
         return float(cleaned)
     except (ValueError, TypeError):
         return default
@@ -293,7 +293,7 @@ class GoogleSheetsService:
         """Получить балансы всех счетов"""
         self._ensure_connection()
         sheet = self.spreadsheet.worksheet(config.SHEET_ACCOUNTS)
-        data = sheet.get_all_values()
+        data = sheet.get_all_values(value_render_option='UNFORMATTED_VALUE')
         
         accounts = []
         for row in data[3:]:  # Пропускаем заголовки
@@ -314,19 +314,11 @@ class GoogleSheetsService:
         sheet = self.spreadsheet.worksheet(config.SHEET_CATEGORIES)
         data = sheet.get_all_values()
 
-        logger.info(f"📋 Читаю лист 'Категории', всего строк: {len(data)}")
-
         categories = []
         for idx, row in enumerate(data[1:], start=2):  # Пропускаем заголовок, нумерация с 2
             if row[1] and row[1].strip():
                 cat_name = row[1].strip()
                 cat_type = row[0].strip() if row[0] else ""
-
-                # Отладка для всех категорий расходов
-                if cat_type == "Расход":
-                    logger.info(f"  Строка {idx}: {cat_name}")
-                    logger.info(f"    row[2] (budget) = '{row[2]}' -> {safe_float(row[2]) if row[2] else 0}")
-                    logger.info(f"    row[3] (spent) = '{row[3]}' -> {safe_float(row[3]) if row[3] else 0}")
 
                 categories.append({
                     "type": cat_type,
@@ -750,6 +742,8 @@ class GoogleSheetsService:
         # Определяем диапазон дней
         today = datetime.now().day
         # Вычисляем начало недели (days_back дней назад)
+        # Примечание: таблица содержит данные только за текущий месяц,
+        # поэтому в начале месяца отчёт будет неполным (только дни текущего месяца)
         start_day = max(1, today - days_back + 1)
 
         # Собираем транзакции за период
@@ -800,10 +794,14 @@ class GoogleSheetsService:
         income_by_category = dict(sorted(income_by_category.items(), key=lambda x: x[1], reverse=True))
         expense_by_category = dict(sorted(expense_by_category.items(), key=lambda x: x[1], reverse=True))
 
+        # Флаг: данные обрезаны началом месяца
+        truncated = (today - days_back + 1) < 1
+
         return {
             "start_day": start_day,
             "end_day": today,
             "days_count": days_back,
+            "truncated": truncated,
             "total_income": total_income,
             "total_expense": total_expense,
             "total_hours": total_hours,
