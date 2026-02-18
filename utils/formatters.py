@@ -59,11 +59,13 @@ def format_stats_message(data: Dict[str, Any]) -> str:
     ]
 
     # Заработок в час (если есть данные о часах)
+    BASE_HOURLY_RATE = 6.5
     total_hours = data.get('total_hours', 0)
     if total_hours and total_hours > 0:
-        total_tips = data.get('total_tips', 0) or data.get('total_income', 0)
-        hourly_rate = total_tips / total_hours
-        lines.append(f"⏰ Отработано: **{total_hours:.1f} ч** → **{format_money(hourly_rate)}/ч**")
+        total_tips = data.get('total_tips', 0) or 0
+        total_earned = total_tips + total_hours * BASE_HOURLY_RATE
+        effective_rate = total_earned / total_hours
+        lines.append(f"⏰ Отработано: **{total_hours:.1f} ч** → **{format_money(effective_rate)}/ч**")
 
     # Группируем по типу
     income_cats = [c for c in data.get("categories", []) if c["type"] == "Доход"]
@@ -454,13 +456,17 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
     if not data.get("sorted_days"):
         return "💰 **ДОХОДЫ ПО ДНЯМ**\n\nДоходов за месяц пока нет"
 
+    BASE_HOURLY_RATE = 6.5  # Базовая ставка BYN/ч
+
     total_hours = data['total_hours']
     total_tips = data['total_tips']
-    hourly_rate = total_tips / total_hours if total_hours > 0 else 0
 
     hours_line = f"⏰ Отработано: **{total_hours:.1f} ч**"
-    if hourly_rate > 0:
-        hours_line += f" → **{format_money(hourly_rate)}/ч**"
+    if total_hours > 0:
+        base_salary = total_hours * BASE_HOURLY_RATE
+        total_earned = total_tips + base_salary
+        effective_rate = total_earned / total_hours
+        hours_line += f" → **{format_money(effective_rate)}/ч** (чаевые + {BASE_HOURLY_RATE} ставка)"
 
     lines = [
         "💰 **ДОХОДЫ ПО ДНЯМ**\n",
@@ -496,7 +502,8 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
         if day_data["tips"] > 0:
             hourly_calc = ""
             if day_data["hours"] > 0:
-                day_rate = day_data["tips"] / day_data["hours"]
+                day_total = day_data["tips"] + day_data["hours"] * BASE_HOURLY_RATE
+                day_rate = day_total / day_data["hours"]
                 hourly_calc = f" ({day_data['hours']:.1f}ч → {format_money(day_rate)}/ч)"
 
             lines.append(f"  💵 Чаевые: {format_money(day_data['tips'])}{hourly_calc}")
