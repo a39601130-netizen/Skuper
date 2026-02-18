@@ -31,7 +31,8 @@ class AIAdvisor:
         self,
         question: str,
         context: Optional[str] = None,
-        mode: str = "default"
+        mode: str = "default",
+        use_reasoner: bool = False
     ) -> str:
         """
         Отправить вопрос к DeepSeek
@@ -55,8 +56,12 @@ class AIAdvisor:
         if context:
             user_message = f"{context}\n\n---\nВопрос: {question}"
         
+        model = "deepseek-reasoner" if use_reasoner else self.model
+        temperature = 0.4 if use_reasoner or mode in ("default", "detailed") else 0.7
+        max_tokens = 1500 if mode == "detailed" else 1200
+
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=90.0) as client:
                 response = await client.post(
                     self.api_url,
                     headers={
@@ -64,13 +69,13 @@ class AIAdvisor:
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": self.model,
+                        "model": model,
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_message}
                         ],
-                        "temperature": 0.7,
-                        "max_tokens": 1500 if mode == "detailed" else 800
+                        "temperature": temperature,
+                        "max_tokens": max_tokens
                     }
                 )
                 
@@ -250,38 +255,76 @@ class AIAdvisor:
     ) -> str:
         """Получить совет от AI на основе данных бюджета"""
         context = self._format_budget_context(budget_data)
-        question = user_question or 'Проанализируй ситуацию и дай краткий совет дня.'
-        return await self.ask(question, context, 'default')
+        question = user_question or 'Проанализируй финансовую ситуацию за месяц. Укажи тренды, превышения и дай конкретные рекомендации.'
+        # Для глубокого анализа используем reasoner, для вопросов — обычную модель
+        use_reasoner = user_question is None
+        return await self.ask(question, context, 'default', use_reasoner=use_reasoner)
 
     def _format_budget_context(self, data: dict) -> str:
         """Форматировать данные бюджета для AI"""
+        from datetime import datetime
+        today = datetime.now()
+        days_in_month = 30
+        days_passed = today.day
+        month_progress_pct = int(days_passed / days_in_month * 100)
+
+        total_income = data.get('total_income', 0)
+        total_expense = data.get('total_expense', 0)
+
         lines = [
-            f"📊 Доходы за месяц: {data.get('total_income', 0)} BYN",
-            f"💸 Расходы за месяц: {data.get('total_expense', 0)} BYN",
+            f"📅 Текущая дата: {today.strftime('%d.%m.%Y')} (прошло {days_passed} дней из ~{days_in_month}, {month_progress_pct}% месяца)",
+            f"📊 Доходы за месяц: {total_income} BYN",
+            f"💸 Расходы за месяц: {total_expense} BYN",
             f"📈 Баланс: {data.get('balance', 0)} BYN",
-            ''
         ]
+
+        # Тренд расходов: сравниваем с ожидаемым на текущую дату
+        if total_expense > 0 and days_passed > 0:
+            daily_rate = total_expense / days_passed
+            projected_month = daily_rate * days_in_month
+            lines.append(f"📉 Темп расходов: {daily_rate:.1f} BYN/день → прогноз на месяц: {projected_month:.0f} BYN")
+
+        # Заработок в час
+        total_hours = data.get('total_hours', 0)
+        if total_hours and total_hours > 0:
+            total_tips = data.get('total_tips', total_income)
+            hourly = total_tips / total_hours
+            lines.append(f"⏰ Отработано: {total_hours:.1f} ч → {hourly:.2f} BYN/ч")
+
+        lines.append('')
         lines.append('💳 Счета:')
         for acc in data.get('accounts', []):
             lines.append(f"  • {acc['name']}: {acc['current']} {acc['currency']}")
+
         lines.append('')
         lines.append('📁 Расходы по категориям:')
         for cat in data.get('categories', []):
             if cat.get('type') == 'Расход' and cat.get('budget', 0) > 0:
                 progress_pct = int(cat.get('progress', 0) * 100)
+                # Тренд: если прогресс расходов сильно опережает прогресс месяца
+                if progress_pct > month_progress_pct + 20:
+                    trend = "📈 опережает"
+                elif progress_pct < month_progress_pct - 20:
+                    trend = "📉 в норме"
+                else:
+                    trend = ""
                 status = '⚠️' if progress_pct >= 80 else '✅'
-                lines.append(f"  {status} {cat['name']}: {cat['spent']}/{cat['budget']} BYN ({progress_pct}%)")
+                trend_str = f" {trend}" if trend else ""
+                lines.append(f"  {status} {cat['name']}: {cat['spent']}/{cat['budget']} BYN ({progress_pct}%){trend_str}")
+
         if data.get('over_budget'):
             lines.append('')
             lines.append('🚨 ПРЕВЫШЕНИЕ БЮДЖЕТА:')
             for cat in data['over_budget']:
                 over = cat['spent'] - cat['budget']
                 lines.append(f"  • {cat['name']}: +{over} BYN сверх лимита!")
+
         if data.get('near_limit'):
             lines.append('')
             lines.append('⚠️ Близко к лимиту:')
             for cat in data['near_limit']:
                 lines.append(f"  • {cat['name']}: осталось {cat['remaining']} BYN")
+
         return '\n'.join(lines)
 
 # Синглтон для использования

@@ -47,7 +47,8 @@ SHEET_BOT_CONFIG = "Бот конфиг"
 # ============================================
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
-DEEPSEEK_MODEL = "deepseek-chat"
+DEEPSEEK_MODEL = "deepseek-chat"         # Быстрые вопросы
+DEEPSEEK_REASONER = "deepseek-reasoner"  # Глубокий анализ (/advisor)
 
 # ============================================
 # НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ

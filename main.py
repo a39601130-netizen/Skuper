@@ -58,6 +58,7 @@ from bot.handlers.transactions import (
     enter_comment,
     enter_hours,
     enter_exchange_rate,
+    use_auto_rate_callback,
     enter_amount_to,
     confirm_amount_to_callback,
     confirm_callback,
@@ -504,6 +505,7 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_amount)
             ],
             TransactionStates.ENTER_EXCHANGE_RATE: [
+                CallbackQueryHandler(use_auto_rate_callback, pattern="^use_auto_rate$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_exchange_rate),
                 CommandHandler("skip", enter_exchange_rate)
             ],

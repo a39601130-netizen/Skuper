@@ -256,7 +256,7 @@ async def back_pain_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     pain = int(query.data.split('_')[1])
     context.user_data['workout']['back_pain'] = pain
 
-    # Если боль высокая - добавляем предупреждение AI в текст выбора дня
+    # Если боль высокая - предупреждение AI
     warning_text = ""
     if pain >= config.AI_TRIGGERS['back_pain_threshold']:
         advisor = get_advisor()
@@ -267,19 +267,22 @@ async def back_pain_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         warning_text = f"⚠️ **Внимание: боль в спине {pain}/10**\n{warning}\n\n"
 
-    # Предлагаем выбрать день тренировки
-    text = f"""{warning_text}🏋️ **Выбери день тренировки:**
+    # День уже определён автоматически в workout_start_callback — показываем его
+    workout_data = context.user_data.get('workout', {})
+    day_type = workout_data.get('day_type', 'A')
+    day_emoji = "🔵" if day_type == "A" else "🟢"
+    day_name = "Горизонтальный акцент" if day_type == "A" else "Вертикальный акцент"
 
-🔵 **День A** (Горизонтальный акцент):
-Приседания, жим лёжа, тяга, румынская тяга
+    text = f"""{warning_text}🌊 **Где ты на эмоциональной волне?**
 
-🟢 **День B** (Вертикальный акцент):
-Трэп-бар становая, жим стоя, тяга вертикального блока
+📅 День тренировки: {day_emoji} **День {day_type}** ({day_name})
+
+Это важно для Эмоционального Проектора:
 """
     await query.edit_message_text(
         text,
         parse_mode="Markdown",
-        reply_markup=get_day_select_keyboard()
+        reply_markup=get_emotional_wave_keyboard()
     )
     return WorkoutStates.EMOTIONAL_WAVE
 

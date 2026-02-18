@@ -58,6 +58,13 @@ def format_stats_message(data: Dict[str, Any]) -> str:
         f"📈 Баланс: **{format_money(data['balance'])}**"
     ]
 
+    # Заработок в час (если есть данные о часах)
+    total_hours = data.get('total_hours', 0)
+    if total_hours and total_hours > 0:
+        total_tips = data.get('total_tips', 0) or data.get('total_income', 0)
+        hourly_rate = total_tips / total_hours
+        lines.append(f"⏰ Отработано: **{total_hours:.1f} ч** → **{format_money(hourly_rate)}/ч**")
+
     # Группируем по типу
     income_cats = [c for c in data.get("categories", []) if c["type"] == "Доход"]
     expense_cats = [c for c in data.get("categories", []) if c["type"] == "Расход"]

@@ -539,14 +539,33 @@ async def select_currency_callback(update: Update, context: ContextTypes.DEFAULT
     return TransactionStates.SELECT_CURRENCY
 
 
+async def use_auto_rate_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Подтверждение автоматического курса кнопкой (вместо /skip)"""
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    trans = get_user_transaction(user_id)
+
+    if trans.trans_type == "Расход" and trans.exchange_rate and trans.amount_to:
+        await query.edit_message_text(
+            f"✅ Используем курс: **{trans.exchange_rate}**\n"
+            f"💰 Эквивалент: **{trans.amount_to:.2f}** BYN\n\n"
+            "💬 Добавь комментарий (или /skip):",
+            parse_mode="Markdown"
+        )
+        return TransactionStates.ENTER_COMMENT
+
+    await query.edit_message_text("❌ Данные не найдены. Начни с /add", reply_markup=get_main_menu())
+    return ConversationHandler.END
+
+
 async def enter_exchange_rate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ввода курса обмена"""
     user_id = update.effective_user.id
     trans = get_user_transaction(user_id)
 
-    # Если пользователь подтвердил автоматический курс через /skip
+    # Поддержка /skip как запасной вариант (основной путь — кнопка use_auto_rate)
     if update.message.text.strip() == "/skip":
-        # Курс уже установлен и amount_to рассчитан - переходим к комментарию
         if trans.trans_type == "Расход" and trans.exchange_rate and trans.amount_to:
             await update.message.reply_text(
                 f"✅ Используем курс: **{trans.exchange_rate}**\n"
@@ -851,9 +870,14 @@ async def enter_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"💵 Сумма: **{amount}** {trans.currency}\n"
                     f"📊 Курс: **{trans.exchange_rate}** (последний)\n"
                     f"💰 Эквивалент: **{amount_byn:.2f}** BYN\n\n"
-                    f"✅ Курс верный? Отправь `/skip` чтобы продолжить\n"
-                    f"✏️ Или введи новый курс {trans.currency}/BYN:",
-                    parse_mode="Markdown"
+                    f"✅ Курс верный или введи другой {trans.currency}/BYN:",
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton(
+                            f"✅ Использовать курс {trans.exchange_rate}",
+                            callback_data="use_auto_rate"
+                        )
+                    ]])
                 )
                 return TransactionStates.ENTER_EXCHANGE_RATE
             else:
