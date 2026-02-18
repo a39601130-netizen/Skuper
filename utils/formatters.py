@@ -461,19 +461,20 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
     total_hours = data['total_hours']
     total_tips = data['total_tips']
 
-    hours_line = f"⏰ Отработано: **{total_hours:.1f} ч**"
-    if total_hours > 0:
-        base_salary = total_hours * BASE_HOURLY_RATE
-        total_earned = total_tips + base_salary
-        effective_rate = total_earned / total_hours
-        hours_line += f" → **{format_money(effective_rate)}/ч** (чаевые + {BASE_HOURLY_RATE} ставка)"
-
     lines = [
         "💰 **ДОХОДЫ ПО ДНЯМ**\n",
         f"📊 Всего за месяц: **{format_money(data['total_income'])}**",
         f"💵 Чаевые: **{format_money(total_tips)}**",
-        hours_line + "\n"
     ]
+
+    if total_hours > 0:
+        base_salary = total_hours * BASE_HOURLY_RATE
+        total_earned = total_tips + base_salary
+        effective_rate = total_earned / total_hours
+        lines.append(f"💼 Ставка за часы: **{format_money(base_salary)}** ({total_hours:.1f}ч × {BASE_HOURLY_RATE})")
+        lines.append(f"⏰ Итого с учётом ставки: **{format_money(total_earned)}** → **{format_money(effective_rate)}/ч**")
+
+    lines.append("")
 
     by_day = data["by_day"]
     sorted_days = data["sorted_days"]
@@ -500,13 +501,12 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
 
         # Чаевые
         if day_data["tips"] > 0:
-            hourly_calc = ""
+            lines.append(f"  💵 Чаевые: {format_money(day_data['tips'])}")
             if day_data["hours"] > 0:
-                day_total = day_data["tips"] + day_data["hours"] * BASE_HOURLY_RATE
+                day_base = day_data["hours"] * BASE_HOURLY_RATE
+                day_total = day_data["tips"] + day_base
                 day_rate = day_total / day_data["hours"]
-                hourly_calc = f" ({day_data['hours']:.1f}ч → {format_money(day_rate)}/ч)"
-
-            lines.append(f"  💵 Чаевые: {format_money(day_data['tips'])}{hourly_calc}")
+                lines.append(f"  💼 Ставка: {format_money(day_base)} ({day_data['hours']:.1f}ч × {BASE_HOURLY_RATE}) → {format_money(day_rate)}/ч")
 
         # Другие доходы
         if day_data["other"] > 0:
