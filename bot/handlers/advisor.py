@@ -19,37 +19,30 @@ def get_advisor_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
+async def _run_advisor_analysis(context: ContextTypes.DEFAULT_TYPE) -> str:
+    sheets = get_sheets_service()
+    budget_data = sheets.get_monthly_summary()
+    context.user_data['budget_data'] = budget_data
+    advisor = get_advisor()
+    return await advisor.get_advice(budget_data)
+
+
 async def advisor_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /advisor - запуск AI советника"""
-    
     await update.message.reply_text(
-        "🤖 **AI Советник**\n\n"
-        "Анализирую твой бюджет...",
+        "🤖 **AI Советник**\n\nАнализирую твой бюджет...",
         parse_mode="Markdown"
     )
-    
     try:
-        # Получаем данные бюджета
-        sheets = get_sheets_service()
-        budget_data = sheets.get_monthly_summary()
-        
-        # Сохраняем данные для последующих вопросов
-        context.user_data['budget_data'] = budget_data
-        
-        # Получаем совет от AI
-        advisor = get_advisor()
-        advice = await advisor.get_advice(budget_data)
-
+        advice = await _run_advisor_analysis(context)
         await update.message.reply_text(
             f"🤖 AI Советник:\n\n{advice}",
             parse_mode="Markdown",
             reply_markup=get_advisor_keyboard()
         )
-        
     except Exception as e:
         await update.message.reply_text(
-            f"❌ Ошибка: {str(e)}\n\n"
-            "Попробуй позже или проверь настройки API.",
+            f"❌ Ошибка: {str(e)}\n\nПопробуй позже или проверь настройки API.",
             reply_markup=get_main_menu()
         )
 
@@ -58,30 +51,18 @@ async def advisor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback для кнопки AI советника"""
     query = update.callback_query
     await query.answer()
-    
     await query.edit_message_text(
-        "🤖 **AI Советник**\n\n"
-        "Анализирую твой бюджет...",
+        "🤖 **AI Советник**\n\nАнализирую твой бюджет...",
         parse_mode="Markdown"
     )
-    
     try:
-        sheets = get_sheets_service()
-        budget_data = sheets.get_monthly_summary()
-        
-        # Сохраняем данные для последующих вопросов
-        context.user_data['budget_data'] = budget_data
-        
-        advisor = get_advisor()
-        advice = await advisor.get_advice(budget_data)
-
+        advice = await _run_advisor_analysis(context)
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text=f"🤖 AI Советник:\n\n{advice}",
             parse_mode="Markdown",
             reply_markup=get_advisor_keyboard()
         )
-        
     except Exception as e:
         await context.bot.send_message(
             chat_id=query.message.chat_id,
@@ -94,9 +75,9 @@ async def advisor_ask_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     """Callback для кнопки 'Задать вопрос'"""
     query = update.callback_query
     await query.answer()
-    
+
     context.user_data['waiting_advisor_question'] = True
-    
+
     await query.edit_message_text(
         "🤖 **AI Советник**\n\n"
         "💬 Задай свой вопрос о финансах:\n\n"
@@ -114,31 +95,23 @@ async def advisor_refresh_callback(update: Update, context: ContextTypes.DEFAULT
     """Callback для кнопки 'Новый анализ'"""
     query = update.callback_query
     await query.answer("Обновляю данные...")
-    
     await advisor_callback(update, context)
 
 
 async def advisor_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка вопроса к AI советнику"""
-    
     question = update.message.text
-    
-    # Убираем флаг ожидания
     context.user_data['waiting_advisor_question'] = False
-    
-    await update.message.reply_text(
-        "🤖 Думаю над ответом...",
-        parse_mode="Markdown"
-    )
-    
+
+    await update.message.reply_text("🤖 Думаю над ответом...", parse_mode="Markdown")
+
     try:
-        # Получаем сохранённые данные или загружаем новые
         budget_data = context.user_data.get('budget_data')
         if not budget_data:
             sheets = get_sheets_service()
             budget_data = sheets.get_monthly_summary()
             context.user_data['budget_data'] = budget_data
-        
+
         advisor = get_advisor()
         advice = await advisor.get_advice(budget_data, user_question=question)
 
@@ -147,21 +120,16 @@ async def advisor_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
             reply_markup=get_advisor_keyboard()
         )
-        
     except Exception as e:
-        await update.message.reply_text(
-            f"❌ Ошибка: {str(e)}",
-            reply_markup=get_main_menu()
-        )
-    
+        await update.message.reply_text(f"❌ Ошибка: {str(e)}", reply_markup=get_main_menu())
+
     return ConversationHandler.END
 
 
 async def ask_advisor_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало диалога с AI советником"""
-    
     context.user_data['waiting_advisor_question'] = True
-    
+
     await update.message.reply_text(
         "🤖 **AI Советник**\n\n"
         "Задай любой вопрос о своих финансах!\n\n"
@@ -172,5 +140,4 @@ async def ask_advisor_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         "Напиши свой вопрос или /cancel для отмены:",
         parse_mode="Markdown"
     )
-    
     return AdvisorStates.WAITING_QUESTION
