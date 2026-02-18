@@ -209,9 +209,11 @@ def format_transaction_success(
                     lines.append(f"\n💳 **{account}:** {format_money(balance, currency)}")
 
             # Получаем остаток по категории (только для расходов)
+            # Используем get_monthly_summary() вместо get_categories_budget(),
+            # т.к. формулы на листе "Категории" могут не работать
             if category and trans_type == "Расход":
-                categories = sheets.get_categories_budget()
-                cat_data = next((c for c in categories if c["name"] == category and c["type"] == "Расход"), None)
+                summary = sheets.get_monthly_summary()
+                cat_data = next((c for c in summary["categories"] if c["name"] == category and c["type"] == "Расход"), None)
                 if cat_data and cat_data["budget"] > 0:
                     remaining = cat_data["remaining"]
                     budget = cat_data["budget"]
