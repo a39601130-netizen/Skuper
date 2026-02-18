@@ -454,11 +454,19 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
     if not data.get("sorted_days"):
         return "💰 **ДОХОДЫ ПО ДНЯМ**\n\nДоходов за месяц пока нет"
 
+    total_hours = data['total_hours']
+    total_tips = data['total_tips']
+    hourly_rate = total_tips / total_hours if total_hours > 0 else 0
+
+    hours_line = f"⏰ Отработано: **{total_hours:.1f} ч**"
+    if hourly_rate > 0:
+        hours_line += f" → **{format_money(hourly_rate)}/ч**"
+
     lines = [
         "💰 **ДОХОДЫ ПО ДНЯМ**\n",
         f"📊 Всего за месяц: **{format_money(data['total_income'])}**",
-        f"💵 Чаевые: **{format_money(data['total_tips'])}**",
-        f"⏰ Отработано часов: **{data['total_hours']:.1f}** (= {format_money(data['total_hours'] * 6.5)})\n"
+        f"💵 Чаевые: **{format_money(total_tips)}**",
+        hours_line + "\n"
     ]
 
     by_day = data["by_day"]
@@ -488,7 +496,8 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
         if day_data["tips"] > 0:
             hourly_calc = ""
             if day_data["hours"] > 0:
-                hourly_calc = f" ({day_data['hours']:.1f}ч × 6.5 = {format_money(day_data['hours'] * 6.5)})"
+                day_rate = day_data["tips"] / day_data["hours"]
+                hourly_calc = f" ({day_data['hours']:.1f}ч → {format_money(day_rate)}/ч)"
 
             lines.append(f"  💵 Чаевые: {format_money(day_data['tips'])}{hourly_calc}")
 
