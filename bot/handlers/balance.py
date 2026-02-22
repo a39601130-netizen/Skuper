@@ -37,47 +37,47 @@ async def _get_income_stats_message() -> str:
     return format_income_by_days(data)
 
 
-async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /balance - показать балансы счетов"""
+async def _handle_command(update, get_data, error_prefix=""):
+    """Общий паттерн для команд: получить данные и отправить"""
     try:
-        message = await _get_balance_message()
+        message = await get_data()
         await update.message.reply_text(message, parse_mode="Markdown", reply_markup=get_main_menu())
     except Exception as e:
         await update.message.reply_text(
-            f"❌ Ошибка загрузки балансов: {str(e)}\n\nПроверь подключение к Google Sheets.",
+            f"❌ {error_prefix}{str(e)}" if error_prefix else f"❌ Ошибка: {str(e)}",
             reply_markup=get_main_menu()
         )
 
 
-async def balance_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Callback для кнопки балансов"""
+async def _handle_callback(update, get_data, reply_markup=None):
+    """Общий паттерн для callback: ответить и отредактировать сообщение"""
     query = update.callback_query
     await query.answer()
     try:
-        message = await _get_balance_message()
-        await safe_edit_message(query, message, parse_mode="Markdown", reply_markup=get_main_menu())
+        message = await get_data()
+        await safe_edit_message(query, message, parse_mode="Markdown", reply_markup=reply_markup or get_main_menu())
     except Exception as e:
         await query.edit_message_text(f"❌ Ошибка: {str(e)}", reply_markup=get_main_menu())
+
+
+async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /balance - показать балансы счетов"""
+    await _handle_command(update, _get_balance_message, "Ошибка загрузки балансов: ")
+
+
+async def balance_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback для кнопки балансов"""
+    await _handle_callback(update, _get_balance_message)
 
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /stats - статистика за месяц"""
-    try:
-        message = await _get_stats_message()
-        await update.message.reply_text(message, parse_mode="Markdown", reply_markup=get_main_menu())
-    except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка загрузки статистики: {str(e)}", reply_markup=get_main_menu())
+    await _handle_command(update, _get_stats_message, "Ошибка загрузки статистики: ")
 
 
 async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback для кнопки статистики"""
-    query = update.callback_query
-    await query.answer()
-    try:
-        message = await _get_stats_message()
-        await safe_edit_message(query, message, parse_mode="Markdown", reply_markup=get_main_menu())
-    except Exception as e:
-        await query.edit_message_text(f"❌ Ошибка: {str(e)}", reply_markup=get_main_menu())
+    await _handle_callback(update, _get_stats_message)
 
 
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -102,22 +102,12 @@ async def history_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def income_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /income - статистика доходов по дням"""
-    try:
-        message = await _get_income_stats_message()
-        await update.message.reply_text(message, parse_mode="Markdown", reply_markup=get_main_menu())
-    except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка загрузки доходов: {str(e)}", reply_markup=get_main_menu())
+    await _handle_command(update, _get_income_stats_message, "Ошибка загрузки доходов: ")
 
 
 async def income_stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback для кнопки статистики доходов"""
-    query = update.callback_query
-    await query.answer()
-    try:
-        message = await _get_income_stats_message()
-        await safe_edit_message(query, message, parse_mode="Markdown", reply_markup=get_main_menu())
-    except Exception as e:
-        await query.edit_message_text(f"❌ Ошибка: {str(e)}", reply_markup=get_main_menu())
+    await _handle_callback(update, _get_income_stats_message)
 
 
 async def delete_transaction_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

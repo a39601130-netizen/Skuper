@@ -54,13 +54,6 @@ class WorkoutStates(IntEnum):
     WORKOUT_COMPLETE = auto()   # Тренировка завершена
 
 
-class SettingsStates(IntEnum):
-    """Состояния для настроек"""
-    MAIN_SETTINGS = auto()
-    EDIT_ACCOUNTS = auto()
-    EDIT_CATEGORIES = auto()
-
-
 # Данные транзакции в процессе создания
 class TransactionData:
     """Хранение данных транзакции во время диалога"""

@@ -2,6 +2,7 @@
 Клавиатуры и меню для Telegram бота
 """
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+import config
 
 # === ВЫБОР ДАТЫ ===
 def get_date_keyboard() -> InlineKeyboardMarkup:
@@ -105,36 +106,9 @@ def get_categories_keyboard(categories: list, trans_type: str) -> InlineKeyboard
     """Клавиатура выбора категории"""
     keyboard = []
 
-    # Маппинг эмодзи для категорий
-    category_emoji = {
-        # Доходы
-        "Зарплата": "💰",
-        "Чаевые": "💵",
-        "Подработка": "💼",
-        "Другое": "💸",
-
-        # Расходы
-        "Продукты": "🛒",
-        "Кафе": "☕",
-        "Транспорт": "🚌",
-        "Такси": "🚕",
-        "Досуг": "🎮",
-        "Покупки": "🛍️",
-        "Здоровье и красота": "💅",
-        "Аптека": "💊",
-        "Ништяки": "🍫",
-        "Аренда": "🏠",
-        "Коммуналка": "🔌",
-        "Интернет и связь": "📱",
-        "Кошки": "🐱",
-        "Долги": "💳",
-        "Одежда": "👕",
-        "Подарки": "🎁"
-    }
-
     row = []
     for cat in categories:
-        emoji = category_emoji.get(cat, "📁")
+        emoji = config.CATEGORY_EMOJI.get(cat, "📁")
         row.append(InlineKeyboardButton(
             f"{emoji} {cat}",
             callback_data=f"cat_{cat}"

@@ -52,9 +52,8 @@ def clear_user_transaction(user_id: int):
 
 def get_user_transaction(user_id: int) -> TransactionData:
     """Получить или создать данные транзакции для пользователя"""
-    # Периодически очищаем старые транзакции
-    if len(user_transactions) > 100:
-        cleanup_old_transactions()
+    # Очищаем устаревшие транзакции (старше TTL)
+    cleanup_old_transactions()
 
     if user_id not in user_transactions:
         user_transactions[user_id] = TransactionData()
@@ -152,37 +151,17 @@ async def select_type_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
         log_conversation_state(user_id, "SELECT_TYPE", "select_type_callback", {"data": data})
 
-        if data == "add_expense":
-            trans.trans_type = "Расход"
-            await query.edit_message_text(
-                "💸 **Расход**\n\n📅 Выбери дату:",
-                parse_mode="Markdown",
-                reply_markup=get_date_keyboard()
-            )
-            return TransactionStates.SELECT_DATE
+        type_map = {
+            "add_expense": ("Расход", "💸"),
+            "add_income": ("Доход", "💰"),
+            "add_transfer": ("Перевод", "🔄"),
+            "add_exchange": ("Обмен валюты", "💱"),
+        }
 
-        elif data == "add_income":
-            trans.trans_type = "Доход"
+        if data in type_map:
+            trans.trans_type, emoji = type_map[data]
             await query.edit_message_text(
-                "💰 **Доход**\n\n📅 Выбери дату:",
-                parse_mode="Markdown",
-                reply_markup=get_date_keyboard()
-            )
-            return TransactionStates.SELECT_DATE
-
-        elif data == "add_transfer":
-            trans.trans_type = "Перевод"
-            await query.edit_message_text(
-                "🔄 **Перевод**\n\n📅 Выбери дату:",
-                parse_mode="Markdown",
-                reply_markup=get_date_keyboard()
-            )
-            return TransactionStates.SELECT_DATE
-
-        elif data == "add_exchange":
-            trans.trans_type = "Обмен валюты"
-            await query.edit_message_text(
-                "💱 **Обмен валюты**\n\n📅 Выбери дату:",
+                f"{emoji} **{trans.trans_type}**\n\n📅 Выбери дату:",
                 parse_mode="Markdown",
                 reply_markup=get_date_keyboard()
             )

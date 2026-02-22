@@ -190,9 +190,11 @@ class GoogleSheetsService:
         self.client = None
         self.spreadsheet = None
         self._last_connect = 0
-        # Кэш для справочников (уменьшает запросы к API)
+        # Кэш для справочников и счетов (уменьшает запросы к API)
         self._references_cache = None
         self._references_cache_time = 0
+        self._accounts_cache = None
+        self._accounts_cache_time = 0
         self._cache_ttl = 600  # 10 минут - справочники редко меняются
         self._connect()
 
@@ -454,7 +456,7 @@ class GoogleSheetsService:
 
     def get_account_currency(self, account_name: str) -> str:
         """
-        Получить валюту счета
+        Получить валюту счета (с кэшированием через get_accounts_balance)
 
         Args:
             account_name: Название счета
@@ -463,7 +465,15 @@ class GoogleSheetsService:
             Валюта счета (BYN, USD, EUR, RUB), по умолчанию BYN
         """
         try:
-            accounts = self.get_accounts_balance()
+            # Используем кэш счетов если он свежий
+            if (self._accounts_cache
+                    and time.time() - self._accounts_cache_time < self._cache_ttl):
+                accounts = self._accounts_cache
+            else:
+                accounts = self.get_accounts_balance()
+                self._accounts_cache = accounts
+                self._accounts_cache_time = time.time()
+
             for acc in accounts:
                 if acc["name"] == account_name:
                     return acc.get("currency", "BYN")

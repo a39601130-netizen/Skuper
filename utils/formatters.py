@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 import re
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +60,10 @@ def format_stats_message(data: Dict[str, Any]) -> str:
     ]
 
     # Заработок в час (если есть данные о часах)
-    BASE_HOURLY_RATE = 6.5
     total_hours = data.get('total_hours', 0)
     if total_hours and total_hours > 0:
         total_tips = data.get('total_tips', 0) or 0
-        total_earned = total_tips + total_hours * BASE_HOURLY_RATE
+        total_earned = total_tips + total_hours * config.config.BASE_HOURLY_RATE
         effective_rate = total_earned / total_hours
         lines.append(f"⏰ Отработано: **{total_hours:.1f} ч** → **{format_money(effective_rate)}/ч**")
 
@@ -91,33 +91,13 @@ def format_stats_message(data: Dict[str, Any]) -> str:
 
         expense_cats = sorted(expense_cats, key=sort_key)
 
-        # Маппинг эмодзи для категорий
-        category_emoji = {
-            "Продукты": "🛒",
-            "Кафе": "☕",
-            "Транспорт": "🚌",
-            "Такси": "🚕",
-            "Досуг": "🎮",
-            "Покупки": "🛍️",
-            "Здоровье и красота": "💅",
-            "Аптека": "💊",
-            "Ништяки": "🍫",
-            "Аренда": "🏠",
-            "Коммуналка": "🔌",
-            "Интернет и связь": "📱",
-            "Кошки": "🐱",
-            "Долги": "💳",
-            "Одежда": "👕",
-            "Подарки": "🎁"
-        }
-
         for cat in expense_cats:
             spent = cat["spent"]
             budget = cat["budget"]
 
             # Показываем категории с расходами ИЛИ с бюджетом
             if spent > 0 or budget > 0:
-                emoji = category_emoji.get(cat['name'], "📁")
+                emoji = config.CATEGORY_EMOJI.get(cat['name'], "📁")
 
                 if budget > 0:
                     # Есть бюджет - показываем прогресс
@@ -196,8 +176,7 @@ def format_transaction_success(
         lines.append(f"💬 {comment}")
 
     if hours:
-        hourly_rate = 6.5  # Ставка в час
-        earned = hours * hourly_rate
+        earned = hours * config.config.BASE_HOURLY_RATE
         lines.append(f"⏰ Часы: {hours} (= {format_money(earned)} по ставке)")
 
     lines.append(f"📅 {datetime.now().strftime('%d.%m.%Y')}")
@@ -218,11 +197,9 @@ def format_transaction_success(
                     lines.append(f"\n💳 **{account}:** {format_money(balance, currency)}")
 
             # Получаем остаток по категории (только для расходов)
-            # Используем get_monthly_summary() вместо get_categories_budget(),
-            # т.к. формулы на листе "Категории" могут не работать
             if category and trans_type == "Расход":
-                summary = sheets.get_monthly_summary()
-                cat_data = next((c for c in summary["categories"] if c["name"] == category and c["type"] == "Расход"), None)
+                categories = sheets.get_categories_budget()
+                cat_data = next((c for c in categories if c["name"] == category and c["type"] == "Расход"), None)
                 if cat_data and cat_data["budget"] > 0:
                     remaining = cat_data["remaining"]
                     budget = cat_data["budget"]
@@ -258,9 +235,6 @@ def parse_quick_input(text: str) -> Optional[Dict[str, Any]]:
         Dict с полями: type, amount, category, comment, hours, to_account
         или None если не удалось распарсить
     """
-    import logging
-    logger = logging.getLogger(__name__)
-
     text = text.strip().lower()
     logger.info(f"[PARSE] Original text: {text}")
 
@@ -456,8 +430,6 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
     if not data.get("sorted_days"):
         return "💰 **ДОХОДЫ ПО ДНЯМ**\n\nДоходов за месяц пока нет"
 
-    BASE_HOURLY_RATE = 6.5  # Базовая ставка BYN/ч
-
     total_hours = data['total_hours']
     total_tips = data['total_tips']
 
@@ -468,10 +440,10 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
     ]
 
     if total_hours > 0:
-        base_salary = total_hours * BASE_HOURLY_RATE
+        base_salary = total_hours * config.BASE_HOURLY_RATE
         total_earned = total_tips + base_salary
         effective_rate = total_earned / total_hours
-        lines.append(f"💼 Ставка за часы: **{format_money(base_salary)}** ({total_hours:.1f}ч × {BASE_HOURLY_RATE})")
+        lines.append(f"💼 Ставка за часы: **{format_money(base_salary)}** ({total_hours:.1f}ч × {config.BASE_HOURLY_RATE})")
         lines.append(f"⏰ Итого с учётом ставки: **{format_money(total_earned)}** → **{format_money(effective_rate)}/ч**")
 
     lines.append("")
@@ -503,10 +475,10 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
         if day_data["tips"] > 0:
             lines.append(f"  💵 Чаевые: {format_money(day_data['tips'])}")
             if day_data["hours"] > 0:
-                day_base = day_data["hours"] * BASE_HOURLY_RATE
+                day_base = day_data["hours"] * config.BASE_HOURLY_RATE
                 day_total = day_data["tips"] + day_base
                 day_rate = day_total / day_data["hours"]
-                lines.append(f"  💼 Ставка: {format_money(day_base)} ({day_data['hours']:.1f}ч × {BASE_HOURLY_RATE}) → {format_money(day_rate)}/ч")
+                lines.append(f"  💼 Ставка: {format_money(day_base)} ({day_data['hours']:.1f}ч × {config.BASE_HOURLY_RATE}) → {format_money(day_rate)}/ч")
 
         # Другие доходы
         if day_data["other"] > 0:
@@ -543,8 +515,7 @@ def format_weekly_report(data: Dict[str, Any]) -> str:
 
     # Часы работы (если есть)
     if data['total_hours'] > 0:
-        hourly_rate = 6.5
-        expected = data['total_hours'] * hourly_rate
+        expected = data['total_hours'] * config.BASE_HOURLY_RATE
         lines.append(f"⏰ **Отработано:** {data['total_hours']:.1f} часов")
         lines.append(f"   (= {format_money(expected)} по ставке)\n")
 
