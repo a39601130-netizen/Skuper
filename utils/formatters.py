@@ -63,7 +63,7 @@ def format_stats_message(data: Dict[str, Any]) -> str:
     total_hours = data.get('total_hours', 0)
     if total_hours and total_hours > 0:
         total_tips = data.get('total_tips', 0) or 0
-        total_earned = total_tips + total_hours * config.config.BASE_HOURLY_RATE
+        total_earned = total_tips + total_hours * config.BASE_HOURLY_RATE
         effective_rate = total_earned / total_hours
         lines.append(f"⏰ Отработано: **{total_hours:.1f} ч** → **{format_money(effective_rate)}/ч**")
 
@@ -176,7 +176,7 @@ def format_transaction_success(
         lines.append(f"💬 {comment}")
 
     if hours:
-        earned = hours * config.config.BASE_HOURLY_RATE
+        earned = hours * config.BASE_HOURLY_RATE
         lines.append(f"⏰ Часы: {hours} (= {format_money(earned)} по ставке)")
 
     lines.append(f"📅 {datetime.now().strftime('%d.%m.%Y')}")
