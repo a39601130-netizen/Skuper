@@ -21,8 +21,25 @@ export default function DashboardPage() {
   }, []);
 
   if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
-  if (error) return <div className="page"><div className="empty">{error}</div></div>;
-  if (!summary) return null;
+  if (error) return (
+    <div className="page">
+      <div className="error-box">
+        <div className="error-icon">⚠️</div>
+        <div className="error-text">{error}</div>
+        <button className="btn btn-primary" onClick={() => window.location.reload()}>
+          Повторить
+        </button>
+      </div>
+    </div>
+  );
+  if (!summary) return (
+    <div className="page">
+      <div className="empty">
+        <div className="empty-icon">📊</div>
+        <div>Нет данных</div>
+      </div>
+    </div>
+  );
 
   const expenseCategories = summary.categories
     .filter((c) => c.type === 'Расход' && c.spent > 0)
