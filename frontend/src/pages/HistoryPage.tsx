@@ -23,10 +23,10 @@ export default function HistoryPage() {
 
   useEffect(load, []);
 
-  const handleDelete = async (rowIndex: number) => {
+  const handleDelete = async (id: number) => {
     if (!confirm('Удалить транзакцию?')) return;
     try {
-      await deleteTransaction(rowIndex);
+      await deleteTransaction(id);
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       load();
     } catch {
@@ -52,14 +52,14 @@ export default function HistoryPage() {
             const isExpense = tx.type === 'Расход';
             const isIncome = tx.type === 'Доход';
             return (
-              <div className="list-item" key={tx.row_index}>
+              <div className="list-item" key={tx.id}>
                 <span className="list-item-icon">{emoji}</span>
                 <div className="list-item-content">
                   <div className="list-item-title">
                     {tx.category || tx.type}
                   </div>
                   <div className="list-item-meta">
-                    {tx.full_date || `${tx.day} число`}
+                    {tx.date}
                     {tx.account && ` · ${tx.account}`}
                     {tx.comment && ` · ${tx.comment}`}
                   </div>
@@ -70,7 +70,7 @@ export default function HistoryPage() {
                   </div>
                   <button
                     className="btn-delete"
-                    onClick={() => handleDelete(tx.row_index)}
+                    onClick={() => handleDelete(tx.id)}
                     style={{
                       background: 'none', border: 'none', color: 'var(--danger)',
                       fontSize: 12, cursor: 'pointer', padding: '4px 0',

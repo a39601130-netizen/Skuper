@@ -46,8 +46,8 @@ export const createTransaction = (data: TransactionCreate) =>
     body: JSON.stringify(data),
   });
 
-export const deleteTransaction = (rowIndex: number) =>
-  request<{ status: string }>(`/transactions/${rowIndex}`, { method: 'DELETE' });
+export const deleteTransaction = (id: number) =>
+  request<{ status: string }>(`/transactions/${id}`, { method: 'DELETE' });
 
 // --- Accounts ---
 export const getAccounts = () => request<Account[]>('/accounts');

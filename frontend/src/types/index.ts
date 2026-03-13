@@ -68,23 +68,23 @@ export interface Category {
 }
 
 export interface Transaction {
-  row_index: number;
-  day: string;
+  id: number;
+  date: string;
   type: string;
   account: string;
   category: string;
-  amount: string;
+  amount: number;
   to_account: string;
   comment: string;
-  full_date: string;
-  hours: string;
-  exchange_rate: string;
-  amount_to: string;
+  created_at: string;
+  hours: number | null;
+  exchange_rate: number | null;
+  amount_to: number | null;
   currency: string;
 }
 
 export interface TransactionCreate {
-  day: number;
+  date?: string;
   type: string;
   account: string;
   category?: string;
@@ -157,4 +157,5 @@ export interface References {
   types: string[];
   accounts: string[];
   categories: string[];
+  income_categories: string[];
 }

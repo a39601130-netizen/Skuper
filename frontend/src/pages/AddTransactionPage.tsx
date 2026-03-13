@@ -18,7 +18,7 @@ export default function AddTransactionPage() {
   const [refs, setRefs] = useState<References | null>(null);
   const [step, setStep] = useState<Step>('type');
   const [data, setData] = useState<Partial<TransactionCreate>>({
-    day: new Date().getDate(),
+    date: new Date().toISOString().split('T')[0],
     currency: 'BYN',
   });
   const [loading, setLoading] = useState(false);
@@ -182,7 +182,7 @@ export default function AddTransactionPage() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-ghost" style={{ flex: 1 }}
-              onClick={() => { setStep('type'); setData({ day: new Date().getDate(), currency: 'BYN' }); }}>
+              onClick={() => { setStep('type'); setData({ date: new Date().toISOString().split('T')[0], currency: 'BYN' }); }}>
               Отмена
             </button>
             <button className="btn btn-primary" style={{ flex: 1 }}
