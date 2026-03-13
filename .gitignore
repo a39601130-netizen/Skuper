@@ -4,6 +4,9 @@ google_credentials.json
 *.json
 !package.json
 
+# Node
+node_modules/
+
 # Python
 __pycache__/
 *.py[cod]
