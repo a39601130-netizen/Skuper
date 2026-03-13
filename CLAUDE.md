@@ -1,86 +1,135 @@
 # Budget Bot — Справочник проекта
 
 ## Что это
-Telegram бот для управления финансами и тренировками. Один пользователь (Артур). Google Sheets как БД. DeepSeek AI как советник.
+Telegram Mini App + Bot для управления финансами и тренировками. Один пользователь (Артур).
+- **Mini App**: React 19 + TypeScript → доступна через Telegram WebApp
+- **Bot**: python-telegram-bot v20+ (async) — polling, работает параллельно
+- **БД**: PostgreSQL (primary) + Google Sheets (опциональный экспорт/бэкап)
+- **AI**: DeepSeek как советник
 
 ## Стек
-- Python 3.10+, python-telegram-bot v20+ (async), gspread + oauth2client, httpx, python-dotenv
+- **Frontend**: React 19, TypeScript, Vite 6, react-router-dom 7
+- **Backend**: FastAPI + uvicorn, SQLAlchemy 2.0 async, asyncpg
+- **Bot**: python-telegram-bot v20+ (async)
+- **DB**: PostgreSQL 16 + Google Sheets (backup)
+- **AI**: DeepSeek API (deepseek-chat + deepseek-reasoner)
+- **Deploy**: Docker Compose + Caddy reverse proxy
+
+## URL
+- Mini App: https://budget-bot.duckdns.org
+- API: https://budget-bot.duckdns.org/api/*
 
 ## Структура файлов
 
 ```
-main.py                          (724 стр) — Точка входа, регистрация всех handlers
-config.py                        (166 стр) — Конфигурация, константы (BASE_HOURLY_RATE, CATEGORY_EMOJI)
+run.py                           — Entry point: FastAPI + Bot polling параллельно
+config.py                        — Конфигурация (DATABASE_URL, MINI_APP_URL, BASE_HOURLY_RATE...)
+Dockerfile                       — Multi-stage: Node 20 (frontend) → Python 3.11 (backend)
+docker-compose.yml               — budget_postgres + budget_bot + caddy
+Caddyfile                        — budget-bot.duckdns.org → budget_bot:8000
+requirements.txt
 
+api/
+  app.py                         — FastAPI приложение, SPA fallback, CORS, все роутеры
+  auth.py                        — HMAC-SHA256 валидация Telegram initData
+  deps.py                        — get_current_user(), get_ai()
+  routers/
+    health.py                    — GET /api/health
+    transactions.py              — GET/POST/DELETE /api/transactions
+    accounts.py                  — GET /api/accounts
+    categories.py                — GET /api/categories, GET /api/categories/references
+    stats.py                     — GET /api/stats/monthly|income|weekly
+    workouts.py                  — GET /api/workouts/history|next|weights
+    exercises.py                 — GET /api/exercises, GET /api/exercises/{id}/progress
+    advisor.py                   — POST /api/advisor/ask, GET /api/advisor/analysis
+
+db/
+  database.py                    — engine, async_session, Base, get_db(), init_db()
+  models.py                      — ORM: Account, Category, Transaction, Exercise, Phase,
+                                   Workout, WorkoutSet, CurrentWeight, SheetsSyncLog
+  seed.py                        — Начальные данные: счета, категории, фазы
+  services/
+    finance.py                   — get_accounts, add_transaction, get_monthly_summary...
+    workout.py                   — get_exercises, determine_next_day, get_current_weights...
+
+frontend/
+  package.json                   — React 19, react-router-dom 7, Vite 6
+  vite.config.ts                 — proxy /api → localhost:8000
+  src/
+    main.tsx                     — Инициализация Telegram WebApp, рендер App
+    App.tsx                      — Routes: 5 страниц
+    api/client.ts                — Все API вызовы с X-Telegram-Init-Data заголовком
+    hooks/useTelegram.ts         — useTelegram(): tg, user, haptic
+    components/BottomNav.tsx     — 5 вкладок навигации
+    pages/
+      DashboardPage.tsx          — Сводка, счета, прогресс категорий
+      HistoryPage.tsx            — Последние транзакции с удалением
+      AddTransactionPage.tsx     — Пошаговый ввод транзакции
+      WorkoutsPage.tsx           — Следующая тренировка + текущие веса
+      AdvisorPage.tsx            — AI советник (чат)
+    styles/global.css            — Dark theme, CSS variables, mobile-first
+    types/index.ts               — TypeScript типы
+
+main.py                          — Telegram bot: create_application(), _register_handlers()
 bot/
-  states.py                      (151 стр) — TransactionStates, AdvisorStates, WorkoutStates, TransactionData
+  states.py                      — TransactionStates, AdvisorStates, WorkoutStates
   handlers/
-    start.py                     (83 стр)  — /start, /help, start_command, help_command
-    transactions.py              (1073 стр) — /add, быстрый ввод, весь ConversationHandler транзакций
-    balance.py                   (135 стр) — /balance, /stats, /history, /income
-    advisor.py                   (143 стр) — /advisor — AI советник (обёртка)
-    reports.py                   (59 стр)  — /report — еженедельный отчёт
-    debug_commands.py            (57 стр)  — /debug_* команды
+    start.py                     — /start, /help
+    transactions.py              — /add, быстрый ввод, ConversationHandler
+    balance.py                   — /balance, /stats, /history, /income
+    advisor.py                   — /advisor — AI советник
+    reports.py                   — /report — еженедельный отчёт
+    debug_commands.py            — /debug_* команды
     workout/
-      session.py                 (503 стр) — /workout — сессия тренировки
-      exercises.py               (535 стр) — Логика упражнений, подходов, RPE
-      progress.py                (258 стр) — /weights, /progress
+      session.py                 — /workout — сессия тренировки
+      exercises.py               — Логика упражнений, подходов, RPE
+      progress.py                — /weights, /progress
   keyboards/
-    main_menu.py                 (90 стр)  — get_main_menu() — главное inline-меню
-    menus.py                     (205 стр) — Все остальные клавиатуры (add, accounts, categories, confirm, history)
-    workout_kb.py                (173 стр) — Клавиатуры тренировок
+    main_menu.py                 — get_main_menu()
+    menus.py                     — Все остальные клавиатуры
+    workout_kb.py                — Клавиатуры тренировок
 
 services/
-  sheets.py                      (832 стр) — GoogleSheetsService (singleton) — CRUD для финансов
-  workout_sheets.py              (503 стр) — WorkoutSheetsService — CRUD для тренировок
-  ai_advisor.py                  (338 стр) — DeepSeekAdvisor — AI через DeepSeek API
+  sheets.py                      — GoogleSheetsService (legacy, для бэкапа)
+  workout_sheets.py              — WorkoutSheetsService (legacy, для бэкапа)
+  ai_advisor.py                  — AIAdvisor (DeepSeek API)
 
 utils/
-  formatters.py                  (544 стр) — Форматирование сообщений, parse_quick_input()
-  telegram_helpers.py            (13 стр)  — safe_edit_message()
-  debug_logger.py                (164 стр) — Отладочное логирование
+  formatters.py                  — Форматирование сообщений, parse_quick_input()
+  telegram_helpers.py            — safe_edit_message()
+  debug_logger.py                — Отладочное логирование
 
 scripts/
-  archive_month.py               (250 стр) — Архивация месяца в Google Sheets
+  migrate_sheets_to_pg.py        — Одноразовая миграция Google Sheets → PostgreSQL
+  archive_month.py               — Архивация месяца в Sheets
 ```
 
-## Архитектурные паттерны
+## API Authentication
+Telegram Mini App присылает `X-Telegram-Init-Data` заголовок.
+`api/auth.py` валидирует через HMAC-SHA256 с `TELEGRAM_BOT_TOKEN`.
+`api/deps.py:get_current_user()` дополнительно проверяет `TELEGRAM_USER_ID`.
 
-- **ConversationHandler** — пошаговый ввод транзакций (states.py определяет состояния)
-- **Singleton** — `get_sheets_service()`, `get_advisor()` — глобальные экземпляры сервисов
-- **Кэширование** — references_cache, accounts_cache (TTL 10 мин) в GoogleSheetsService
-- **retry_on_error** — декоратор в sheets.py для повторных попыток при ошибках Google API
-- **Быстрый ввод** — `parse_quick_input()` в formatters.py парсит текст вроде "50 продукты магазин"
-- **user_transactions** — dict в transactions.py, хранит TransactionData в памяти по user_id
-
-## Google Sheets — листы
-
-### Финансы (GOOGLE_SHEETS_FINANCE_ID)
-| Лист | Назначение |
-|------|-----------|
-| Транзакции | Записи: день, тип, счёт, категория, сумма, счёт_куда, комментарий, дата, часы |
-| Справочники | Типы, счета, категории (читает бот) |
-| Категории | Бюджеты по категориям |
-| Счета | Балансы счетов, валюта |
-| Дашборд | Сводка (читает бот для статистики) |
-
-### Тренировки (GOOGLE_SHEETS_WORKOUT_ID)
-| Лист | Назначение |
-|------|-----------|
-| Упражнения | Справочник упражнений |
-| Тренировки | Логи тренировок |
-| Подходы | Детали подходов |
-| Текущие веса | Рабочие веса |
-| Фазы | Фазы программы |
-| Разминка | Шаги разминки |
-| Бот конфиг | Настройки бота |
+## Database Models (db/models.py)
+- **Account**: id, name, balance, currency
+- **Category**: id, name, type (Расход/Доход/Перевод), emoji, budget_limit
+- **Transaction**: id, date, type, account_id, category_id, amount, comment, hours, synced_to_sheets
+- **Exercise**: id, exercise_id, name, day_type, muscle_group, equipment
+- **Phase**: id, phase_key, name, week_start, week_end, rpe_min, rpe_max, sets_modifier
+- **Workout**: id, date, day_type, energy_before, energy_after, notes, synced_to_sheets
+- **WorkoutSet**: id, workout_id, exercise_id, set_number, weight, reps, rpe
+- **CurrentWeight**: id, exercise_id, current_weight, target_reps, status
 
 ## Ключевые константы (config.py)
+- `DATABASE_URL` — PostgreSQL connection string (asyncpg)
 - `BASE_HOURLY_RATE = 6.5` — ставка BYN/ч
-- `CATEGORY_EMOJI` — маппинг категория→эмодзи (единый для всего проекта)
+- `CATEGORY_EMOJI` — маппинг категория→эмодзи
 - `HUMAN_DESIGN_CONTEXT` — контекст для AI советника
 
-## Команды бота
+## Google Sheets (опциональный бэкап)
+Флаг `synced_to_sheets=True` на Transaction и Workout означает "уже в Sheets".
+Миграция данных: `python scripts/migrate_sheets_to_pg.py`
+
+## Команды бота (telegram)
 | Команда | Handler | Файл |
 |---------|---------|------|
 | /start | start_command | start.py |
@@ -95,24 +144,26 @@ scripts/
 | /workout | workout_command | workout/session.py |
 | /weights | current_weights_command | workout/progress.py |
 | /progress | progress_command | workout/progress.py |
-| Текст без команды | handle_text_input | transactions.py (быстрый ввод) |
-
-## Callback patterns (menus.py)
-- `menu_*` — навигация по меню
-- `add_*` — тип транзакции
-- `acc_*` — выбор счёта
-- `cat_*` / `quick_*` — выбор категории
-- `confirm_*` — подтверждение
-- `delete_*` — удаление транзакции
-- `date_*` / `currency_*` — дата и валюта
 
 ## Деплой
-- Сервер: VPS, systemd service `budget_bot`
-- Для деплоя используй `/update-bot` (коммит → push → SSH обновление на сервере)
-- Локальный запуск: `python main.py`
+- Сервер: VPS (193.106.251.72), `ssh bot`, `~/Artur/Skuper`
+- Skill: `/update-budget-bot` — коммит + push + перезапуск
+- Skill: `/restart-budget-bot` — только перезапуск
+- Skill: `/budget-bot-logs` — просмотр логов
+- Ручной деплой: `git pull && docker compose up --build -d`
+
+## Локальная разработка
+```bash
+# Backend + Bot
+cd /f/budget_bot && ./venv/Scripts/python.exe run.py
+
+# Frontend (отдельно)
+cd /f/budget_bot/frontend && npm run dev
+```
 
 ## Важно при разработке
-- Это персональный бот (1 пользователь) — не оверинженирить
-- Google Sheets API имеет лимиты — минимизировать вызовы
-- gspread синхронный — блокирует event loop, но для 1 пользователя это ок
-- Не коммитить .env и google_credentials.json
+- НЕ переписывать бот handlers на aiogram — python-telegram-bot v20 оставляем
+- `db/services/` — только async функции, принимают `AsyncSession`
+- Google Sheets API: минимизировать вызовы (лимиты)
+- Не коммитить `.env` и `google_credentials.json`
+- Frontend собирается в `frontend/dist/` → копируется в Docker image
