@@ -137,7 +137,9 @@ class WorkoutSet(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     workout_id: Mapped[int] = mapped_column(ForeignKey("workouts.id"))
-    exercise_id: Mapped[str] = mapped_column(String(50), index=True)
+    exercise_id: Mapped[str] = mapped_column(
+        String(50), ForeignKey("exercises.exercise_id"), index=True
+    )
     set_number: Mapped[int] = mapped_column(Integer)
     weight: Mapped[float] = mapped_column(Float)
     reps: Mapped[int] = mapped_column(Integer)
@@ -146,7 +148,7 @@ class WorkoutSet(Base):
 
     workout: Mapped["Workout"] = relationship(back_populates="sets")
     exercise: Mapped[Optional["Exercise"]] = relationship(
-        "Exercise", foreign_keys=[exercise_id],
+        "Exercise", foreign_keys="[WorkoutSet.exercise_id]",
         primaryjoin="WorkoutSet.exercise_id == Exercise.exercise_id",
         back_populates="sets"
     )
