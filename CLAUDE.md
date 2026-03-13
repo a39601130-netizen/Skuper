@@ -150,6 +150,7 @@ Telegram Mini App присылает `X-Telegram-Init-Data` заголовок.
 - Skill: `/update-budget-bot` — коммит + push + перезапуск
 - Skill: `/restart-budget-bot` — только перезапуск
 - Skill: `/budget-bot-logs` — просмотр логов
+- Skill: `/mobile-deploy` — быстрый деплой с любого устройства
 - Ручной деплой: `git pull && docker compose up --build -d`
 
 ## Локальная разработка
@@ -159,6 +160,60 @@ cd /f/budget_bot && ./venv/Scripts/python.exe run.py
 
 # Frontend (отдельно)
 cd /f/budget_bot/frontend && npm run dev
+```
+
+## Кросс-устройственная разработка (телефон + ноутбук)
+
+### Способ 1: Code Server (рекомендуется для телефона)
+VS Code в браузере — работает на любом устройстве без установки.
+
+**Настройка (один раз на сервере):**
+```bash
+# 1. Добавить пароль в .env на сервере
+echo "CODE_SERVER_PASSWORD=your_password" >> ~/Artur/Skuper/.env
+
+# 2. Запустить code-server
+ssh bot "cd ~/Artur/Skuper && docker compose up -d code_server"
+```
+
+**Доступ:**
+- URL: `https://code.budget-bot.duckdns.org`
+- Пароль: из `CODE_SERVER_PASSWORD` в `.env`
+- Проект открыт в `/home/coder/project`
+
+**Makefile команды (из терминала code-server):**
+```bash
+make deploy    # полный деплой
+make restart   # перезапустить бота
+make logs      # смотреть логи
+make status    # статус контейнеров
+make sync m="описание изменений"  # commit + push + restart
+```
+
+### Способ 2: SSH с телефона
+Приложения: **Termius** (iOS/Android) или **JuiceSSH** (Android)
+
+```bash
+# Настроить SSH host в приложении:
+Host: 193.106.251.72
+User: root
+Alias: bot
+
+# После подключения:
+cd ~/Artur/Skuper
+make logs      # логи
+make restart   # перезапуск
+```
+
+### Способ 3: Claude Code на телефоне
+Открыть `https://claude.ai/code` в браузере → использовать skills:
+- `/mobile-deploy` — задеплоить изменения
+- `/restart-budget-bot` — перезапустить
+- `/budget-bot-logs` — посмотреть логи
+
+### .env переменная для Code Server
+```
+CODE_SERVER_PASSWORD=ваш_пароль_здесь
 ```
 
 ## Важно при разработке

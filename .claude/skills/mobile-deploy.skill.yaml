@@ -1,0 +1,33 @@
+name: mobile-deploy
+description: Быстрый деплой с любого устройства (телефон/ноутбук)
+instructions: |
+  Эта команда делает быстрый деплой текущих изменений на сервер.
+
+  Следуй этим шагам:
+
+  1. ПРОВЕРКА ИЗМЕНЕНИЙ:
+     - Выполни `git status` и `git diff --stat`
+     - Покажи пользователю что будет задеплоено
+
+  2. КОММИТ И ПУШ:
+     - Если есть незакоммиченные изменения:
+       `git add -A && git commit -m "Deploy: <краткое описание изменений>"`
+     - Отправь: `git push origin master`
+
+  3. ОБНОВЛЕНИЕ НА СЕРВЕРЕ:
+     - `ssh bot "cd ~/Artur/Skuper && git pull"`
+
+  4. ПЕРЕЗАПУСК (без rebuild если нет изменений в зависимостях):
+     - Проверь изменились ли requirements.txt, Dockerfile, package.json
+     - Если ДА: `ssh bot "cd ~/Artur/Skuper && docker compose up --build -d budget_bot"`
+     - Если НЕТ: `ssh bot "cd ~/Artur/Skuper && docker compose restart budget_bot"`
+
+  5. ПРОВЕРКА:
+     - Подожди 5 секунд
+     - `ssh bot "cd ~/Artur/Skuper && docker compose ps"`
+     - `ssh bot "cd ~/Artur/Skuper && docker compose logs --tail=20 budget_bot"`
+     - Убедись что статус "Up" и в логах нет ошибок
+
+  ВАЖНО:
+  - Используй TodoWrite для отслеживания прогресса
+  - При ошибке покажи полный вывод команды

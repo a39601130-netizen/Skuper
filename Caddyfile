@@ -1,3 +1,7 @@
 budget-bot.duckdns.org {
     reverse_proxy budget_bot:8000
 }
+
+code.budget-bot.duckdns.org {
+    reverse_proxy budget_code_server:8080
+}

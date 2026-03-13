@@ -51,6 +51,27 @@ services:
         reservations:
           memory: 256M
 
+  code_server:
+    image: codercom/code-server:latest
+    container_name: budget_code_server
+    restart: unless-stopped
+    environment:
+      PASSWORD: ${CODE_SERVER_PASSWORD}
+      TZ: Europe/Minsk
+    volumes:
+      - /root/Artur/Skuper:/home/coder/project
+      - code_server_data:/home/coder/.local
+    expose:
+      - "8080"
+    networks:
+      - lila_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
 networks:
   budget_net:
     driver: bridge
@@ -60,3 +81,4 @@ networks:
 
 volumes:
   postgres_data:
+  code_server_data:
