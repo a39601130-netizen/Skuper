@@ -4,7 +4,7 @@ from datetime import datetime, date
 from typing import Optional, List
 from sqlalchemy import (
     BigInteger, Boolean, Date, DateTime, Float, ForeignKey,
-    Integer, JSON, String, Text, func
+    Integer, JSON, String, Text, UniqueConstraint, func
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,9 +37,10 @@ class Account(Base):
 
 class Category(Base):
     __tablename__ = "categories"
+    __table_args__ = (UniqueConstraint("name", "type", name="uq_category_name_type"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), index=True)
     type: Mapped[str] = mapped_column(String(20))  # Доход / Расход
     emoji: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     budget_limit: Mapped[float] = mapped_column(Float, default=0.0)
