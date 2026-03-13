@@ -51,24 +51,6 @@ services:
         reservations:
           memory: 256M
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: budget_caddy
-    restart: unless-stopped
-    ports:
-      - "8443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    environment:
-      TZ: Europe/Minsk
-    depends_on:
-      budget_bot:
-        condition: service_healthy
-    networks:
-      - budget_net
-
 networks:
   budget_net:
     driver: bridge
@@ -77,6 +59,4 @@ networks:
     name: lila_bot_default
 
 volumes:
-  caddy_data:
-  caddy_config:
   postgres_data:
