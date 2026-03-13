@@ -1,0 +1,27 @@
+name: start-local
+description: Запустить budget_bot локально для тестирования
+instructions: |
+  Запускает budget_bot локально для тестирования изменений.
+
+  ВАЖНО: Этот skill запускается ТОЛЬКО по явной команде пользователя.
+
+  Шаги:
+
+  1. ПРОВЕРИТЬ — НЕТ ЛИ ЗАПУЩЕННОГО БОТА:
+     `ps aux 2>/dev/null | grep "python main.py" | grep -v grep || tasklist 2>/dev/null | grep python`
+     Если бот уже запущен — сообщи пользователю и спроси, перезапустить ли.
+
+  2. ЗАПУСТИТЬ БОТА В ФОНЕ:
+     Bash с run_in_background=true: `cd /f/budget_bot && ./venv/Scripts/python.exe main.py`
+
+  3. ПОДОЖДАТЬ И ПРОВЕРИТЬ:
+     `sleep 4`
+     Проверь логи фонового процесса — должно быть "Budget Bot запущен!" и "Application started".
+
+  4. ПОКАЗАТЬ РЕЗУЛЬТАТ:
+     - Сообщить что бот запущен локально
+     - Напомнить: для остановки используй /stop-local или Ctrl+C в терминале
+
+  ВАЖНО:
+  - .env и google_credentials.json должны быть на месте
+  - Если ошибка импорта — проверь requirements: ./venv/Scripts/pip install -r requirements.txt

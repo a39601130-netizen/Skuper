@@ -43,6 +43,19 @@ SHEET_DASHBOARD_WORKOUT = "Дашборд"
 SHEET_BOT_CONFIG = "Бот конфиг"
 
 # ============================================
+# DATABASE
+# ============================================
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://budget:budget@localhost:5432/budget_bot"
+)
+
+# ============================================
+# MINI APP
+# ============================================
+MINI_APP_URL = os.getenv("MINI_APP_URL", "http://localhost:5173")
+
+# ============================================
 # DEEPSEEK AI
 # ============================================
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")

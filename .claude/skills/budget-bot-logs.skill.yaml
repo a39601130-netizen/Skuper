@@ -1,0 +1,18 @@
+name: budget-bot-logs
+description: Просмотр логов budget_bot на сервере
+instructions: |
+  Просматривает логи budget_bot на сервере.
+
+  Шаги:
+
+  1. ПОКАЗАТЬ СТАТУС КОНТЕЙНЕРОВ:
+     - `ssh bot "docker compose -f ~/Artur/Skuper/docker-compose.yml ps"`
+
+  2. ПОКАЗАТЬ ЛОГИ:
+     - Последние 50 строк budget_bot: `ssh bot "docker compose -f ~/Artur/Skuper/docker-compose.yml logs --tail=50 budget_bot"`
+     - Если нужно больше — используй `--tail=200`
+
+  3. АНАЛИЗ:
+     - Выдели ошибки (ERROR, Exception, Traceback)
+     - Сообщи пользователю о найденных проблемах
+     - Если всё ок — скажи что логи чистые

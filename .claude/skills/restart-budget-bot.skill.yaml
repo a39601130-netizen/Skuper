@@ -1,0 +1,18 @@
+name: restart-budget-bot
+description: Перезапуск budget_bot на сервере без пересборки
+instructions: |
+  Перезапускает budget_bot контейнер на сервере без пересборки образа.
+
+  Шаги:
+
+  1. ПЕРЕЗАПУСК КОНТЕЙНЕРА:
+     - `ssh bot "docker compose -f ~/Artur/Skuper/docker-compose.yml restart budget_bot"`
+
+  2. ПРОВЕРКА СТАТУСА:
+     - Подожди 5 секунд
+     - `ssh bot "docker compose -f ~/Artur/Skuper/docker-compose.yml ps"`
+     - `ssh bot "docker compose -f ~/Artur/Skuper/docker-compose.yml logs --tail=15 budget_bot"`
+
+  3. ПОКАЗАТЬ РЕЗУЛЬТАТ:
+     - Сообщи статус (Up/Down) и последние логи
+     - Если ошибка — показать полные логи с `--tail=50`

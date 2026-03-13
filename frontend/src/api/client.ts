@@ -1,0 +1,87 @@
+import type {
+  Transaction,
+  TransactionCreate,
+  Account,
+  Category,
+  MonthlySummary,
+  ExerciseWeight,
+  Exercise,
+  WorkoutHistory,
+  NextWorkout,
+  AdvisorResponse,
+  References,
+} from '../types';
+
+const API_BASE = '/api';
+
+function getInitData(): string {
+  return window.Telegram?.WebApp?.initData || '';
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Telegram-Init-Data': getInitData(),
+    ...(options.headers as Record<string, string> || {}),
+  };
+
+  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+    throw new Error(error.detail || `HTTP ${response.status}`);
+  }
+
+  if (response.status === 204) return undefined as T;
+  return response.json();
+}
+
+// --- Transactions ---
+export const getTransactions = (limit = 20) =>
+  request<Transaction[]>(`/transactions?limit=${limit}`);
+
+export const createTransaction = (data: TransactionCreate) =>
+  request<{ status: string }>('/transactions', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const deleteTransaction = (rowIndex: number) =>
+  request<{ status: string }>(`/transactions/${rowIndex}`, { method: 'DELETE' });
+
+// --- Accounts ---
+export const getAccounts = () => request<Account[]>('/accounts');
+
+// --- Categories ---
+export const getCategories = () => request<Category[]>('/categories');
+export const getReferences = () => request<References>('/categories/references');
+
+// --- Stats ---
+export const getMonthlySummary = () => request<MonthlySummary>('/stats/monthly');
+export const getIncomeStats = () => request<Record<string, unknown>>('/stats/income');
+export const getWeeklySummary = (daysBack = 7) =>
+  request<Record<string, unknown>>(`/stats/weekly?days_back=${daysBack}`);
+
+// --- Workouts ---
+export const getWorkoutHistory = (limit = 10) =>
+  request<WorkoutHistory[]>(`/workouts/history?limit=${limit}`);
+
+export const getNextWorkout = () => request<NextWorkout>('/workouts/next');
+export const getCurrentWeights = () => request<ExerciseWeight[]>('/workouts/weights');
+
+// --- Exercises ---
+export const getExercises = (day?: 'A' | 'B') =>
+  request<Exercise[]>(`/exercises${day ? `?day=${day}` : ''}`);
+
+export const getExerciseProgress = (exerciseId: string) =>
+  request<Record<string, unknown>>(`/exercises/${exerciseId}/progress`);
+
+// --- Advisor ---
+export const askAdvisor = (question: string, contextType = 'finance', mode = 'default') =>
+  request<AdvisorResponse>('/advisor/ask', {
+    method: 'POST',
+    body: JSON.stringify({ question, context_type: contextType, mode }),
+  });
+
+export const getAnalysis = (type = 'finance') =>
+  request<{ response: string; summary: MonthlySummary }>(`/advisor/analysis?type=${type}`);

@@ -1,0 +1,3 @@
+budget-bot.duckdns.org {
+    reverse_proxy budget_bot:8000
+}
