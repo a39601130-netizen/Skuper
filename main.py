@@ -720,5 +720,169 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
+def create_application():
+    """Создаёт и возвращает Application (без запуска polling).
+    Используется из run.py для параллельного запуска с FastAPI."""
+    setup_debug_logging()
+    acquire_lock()
+    atexit.register(release_lock)
+
+    application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
+    _register_handlers(application)
+    return application
+
+
+def _register_handlers(application):
+    """Регистрирует все handlers на application."""
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("balance", balance_command))
+    application.add_handler(CommandHandler("stats", stats_command))
+    application.add_handler(CommandHandler("income", income_stats_command))
+    application.add_handler(CommandHandler("history", history_command))
+    application.add_handler(CommandHandler("advisor", advisor_command))
+    application.add_handler(CommandHandler("weekly", weekly_report_command))
+    application.add_handler(CommandHandler("bugs", bugs_command))
+    application.add_handler(CommandHandler("clear_bugs", clear_bugs_command))
+
+    add_conv_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("add", add_command),
+            CallbackQueryHandler(menu_add_callback, pattern="^(menu_add|finance_add)$"),
+            CallbackQueryHandler(select_type_callback, pattern="^add_(expense|income|transfer|exchange)$"),
+            CallbackQueryHandler(select_category_callback, pattern="^(quick_|show_all)")
+        ],
+        states={
+            TransactionStates.SELECT_TYPE: [CallbackQueryHandler(select_type_callback, pattern="^add_")],
+            TransactionStates.SELECT_DATE: [
+                CallbackQueryHandler(select_date_callback, pattern="^date_"),
+                CallbackQueryHandler(menu_add_callback, pattern="^(menu_add|finance_add)$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_custom_date)
+            ],
+            TransactionStates.SELECT_ACCOUNT: [CallbackQueryHandler(select_account_callback, pattern="^(from_|income_|expense_|exchange_from_)")],
+            TransactionStates.SELECT_TO_ACCOUNT: [CallbackQueryHandler(select_to_account_callback, pattern="^(to_|exchange_to_)")],
+            TransactionStates.SELECT_CATEGORY: [CallbackQueryHandler(select_category_callback, pattern="^(quick_|cat_|show_all)")],
+            TransactionStates.SELECT_CURRENCY: [CallbackQueryHandler(select_currency_callback, pattern="^currency_")],
+            TransactionStates.ENTER_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_amount)],
+            TransactionStates.ENTER_EXCHANGE_RATE: [
+                CallbackQueryHandler(use_auto_rate_callback, pattern="^use_auto_rate$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_exchange_rate),
+                CommandHandler("skip", enter_exchange_rate)
+            ],
+            TransactionStates.ENTER_AMOUNT_TO: [
+                CallbackQueryHandler(confirm_amount_to_callback, pattern="^confirm_amount_to$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_amount_to),
+                CommandHandler("skip", enter_amount_to)
+            ],
+            TransactionStates.ENTER_COMMENT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_comment),
+                CommandHandler("skip", enter_comment)
+            ],
+            TransactionStates.ENTER_HOURS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_hours),
+                CommandHandler("skip", enter_hours)
+            ],
+            TransactionStates.CONFIRM: [CallbackQueryHandler(confirm_callback, pattern="^confirm_")]
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CallbackQueryHandler(menu_add_callback, pattern="^(menu_add|finance_add)$"),
+            CallbackQueryHandler(cancel_conversation_fallback, pattern="^(menu_|module_|finance_|advisor_|workout_)")
+        ],
+        per_message=False, per_user=True, per_chat=True, conversation_timeout=300
+    )
+    application.add_handler(add_conv_handler, group=0)
+
+    advisor_conv_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("ask", ask_advisor_command),
+            CallbackQueryHandler(advisor_ask_callback, pattern="^advisor_ask$")
+        ],
+        states={
+            AdvisorStates.WAITING_QUESTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, advisor_question)]
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CallbackQueryHandler(cancel_conversation_fallback, pattern="^(menu_|module_|finance_|workout_)")
+        ],
+        per_message=False, per_user=True, per_chat=True, conversation_timeout=300
+    )
+    application.add_handler(advisor_conv_handler, group=0)
+
+    workout_conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(workout_start_callback, pattern="^workout_start$")],
+        states={
+            WorkoutStates.ENERGY_BEFORE: [
+                CallbackQueryHandler(workout_begin_callback, pattern="^workout_begin$"),
+                CallbackQueryHandler(energy_before_callback, pattern="^energy_"),
+                CallbackQueryHandler(low_energy_decision_callback, pattern="^low_energy_"),
+            ],
+            WorkoutStates.SLEEP_HOURS: [MessageHandler(filters.TEXT & ~filters.COMMAND, sleep_hours_input)],
+            WorkoutStates.SLEEP_QUALITY: [CallbackQueryHandler(sleep_quality_callback, pattern="^energy_")],
+            WorkoutStates.BACK_PAIN: [CallbackQueryHandler(back_pain_callback, pattern="^energy_")],
+            WorkoutStates.EMOTIONAL_WAVE: [
+                CallbackQueryHandler(day_select_callback, pattern="^select_day_"),
+                CallbackQueryHandler(emotional_wave_callback, pattern="^wave_"),
+            ],
+            WorkoutStates.WARMUP_PHASE1: [
+                CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
+                CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
+            ],
+            WorkoutStates.WARMUP_PHASE2: [
+                CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
+                CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
+            ],
+            WorkoutStates.WARMUP_PHASE3: [
+                CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
+                CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
+            ],
+            WorkoutStates.WARMUP_PHASE4: [
+                CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
+                CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
+            ],
+            WorkoutStates.EXERCISE_START: [CallbackQueryHandler(warmup_complete_callback, pattern="^warmup_complete$")],
+            WorkoutStates.SET_INPUT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, set_input_handler),
+                CallbackQueryHandler(exercise_skip_callback, pattern="^exercise_skip$"),
+                CallbackQueryHandler(workout_end_early_callback, pattern="^workout_end_early$"),
+            ],
+            WorkoutStates.SET_RPE: [CallbackQueryHandler(rpe_callback, pattern="^rpe_")],
+            WorkoutStates.REST_TIMER: [
+                CallbackQueryHandler(timer_skip_callback, pattern="^timer_skip$"),
+                CallbackQueryHandler(timer_add_callback, pattern="^timer_add_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, set_input_handler),
+            ],
+            WorkoutStates.EXERCISE_COMPLETE: [
+                CallbackQueryHandler(exercise_next_callback, pattern="^exercise_next$"),
+                CallbackQueryHandler(workout_end_early_callback, pattern="^workout_end_early$"),
+            ],
+            WorkoutStates.ENERGY_AFTER: [CallbackQueryHandler(energy_after_callback, pattern="^energy_")],
+        },
+        fallbacks=[
+            CallbackQueryHandler(workout_cancel_callback, pattern="^workout_cancel$"),
+            CommandHandler("cancel", workout_cancel_callback),
+            CallbackQueryHandler(cancel_conversation_fallback, pattern="^(menu_|module_|finance_|advisor_)")
+        ],
+        per_message=False, per_user=True, per_chat=True, conversation_timeout=3600
+    )
+    application.add_handler(workout_conv_handler, group=0)
+
+    application.add_handler(CallbackQueryHandler(workout_menu_callback, pattern="^module_workout$"))
+    application.add_handler(CallbackQueryHandler(workout_progress_callback, pattern="^workout_progress$"))
+    application.add_handler(CallbackQueryHandler(workout_weights_callback, pattern="^workout_weights$"))
+    application.add_handler(CallbackQueryHandler(workout_history_callback, pattern="^workout_history$"))
+    application.add_handler(CallbackQueryHandler(workout_next_callback, pattern="^workout_next$"))
+    application.add_handler(CallbackQueryHandler(workout_ai_analysis_callback, pattern="^workout_ai_analysis$"))
+    application.add_handler(CallbackQueryHandler(workout_show_progress_callback, pattern="^workout_show_progress$"))
+    application.add_handler(CallbackQueryHandler(workout_delete_last_callback, pattern="^workout_delete_last$"))
+    application.add_handler(CallbackQueryHandler(workout_delete_confirm_callback, pattern="^workout_delete_confirm$"))
+
+    application.add_handler(CallbackQueryHandler(advisor_refresh_callback, pattern="^advisor_refresh$"))
+    application.add_handler(CallbackQueryHandler(delete_transaction_callback, pattern="^delete_"))
+    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^(menu_|module_|finance_|advisor_)"))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=1)
+    application.add_error_handler(error_handler)
+
+
 if __name__ == "__main__":
     main()
