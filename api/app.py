@@ -4,7 +4,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from api.routers import health, transactions, accounts, categories, stats, workouts, exercises, advisor, recurring
 
@@ -54,7 +54,14 @@ def create_app() -> FastAPI:
                 return FileResponse(file_path)
             index = os.path.join(FRONTEND_DIR, "index.html")
             if os.path.isfile(index):
-                return FileResponse(index)
+                return FileResponse(
+                    index,
+                    headers={
+                        "Cache-Control": "no-cache, no-store, must-revalidate",
+                        "Pragma": "no-cache",
+                        "Expires": "0",
+                    },
+                )
             return JSONResponse({"detail": "Frontend not built"}, status_code=404)
 
     return app
