@@ -70,6 +70,8 @@ export interface Category {
 export interface Transaction {
   id: number;
   date: string;
+  day: number;
+  full_date: string;
   type: string;
   account: string;
   category: string;
@@ -80,7 +82,6 @@ export interface Transaction {
   exchange_rate: number | null;
   amount_to: number | null;
   currency: string;
-  created_at: string;
 }
 
 export interface TransactionCreate {
@@ -106,8 +107,13 @@ export interface MonthlySummary {
   categories: Category[];
   over_budget: Category[];
   near_limit: Category[];
-  month: number;
-  year: number;
+}
+
+export interface References {
+  types: string[];
+  accounts: string[];
+  categories: string[];
+  income_categories: string[];
 }
 
 // Workout types
@@ -121,14 +127,9 @@ export interface Exercise {
   current_weight?: number;
   target_reps?: string;
   status?: string;
-  reps_min?: number;
-  reps_max?: number;
-  rest_seconds?: number;
-  default_sets?: number;
 }
 
 export interface WorkoutHistory {
-  id: number;
   date: string;
   day_type: string;
   week: number;
@@ -136,7 +137,8 @@ export interface WorkoutHistory {
   energy_before: number;
   energy_after: number;
   sleep_hours: number;
-  back_pain: number;
+  sleep_quality: string;
+  back_pain: string;
   emotional_wave: string;
   notes: string;
 }
@@ -151,114 +153,81 @@ export interface ExerciseWeight {
   status: string;
 }
 
-export interface NextWorkout {
-  next_day: string;
-  phase: Record<string, string | number>;
-  exercises: Exercise[];
-}
-
-// Workout session types
-export interface WorkoutCreate {
-  day_type: string;
-  energy_before: number;
-  sleep_hours?: number;
-  sleep_quality?: number;
-  back_pain?: number;
-  emotional_wave?: string;
-}
-
-export interface WorkoutComplete {
-  energy_after: number;
-  notes?: string;
-}
-
-export interface WorkoutSetCreate {
+export interface ExerciseProgress {
   exercise_id: string;
-  set_number: number;
-  weight: number;
-  reps: number;
-  rpe?: number;
-  notes?: string;
+  current_weight: number;
+  target_reps: string;
+  status: string;
+  trend: 'up' | 'down' | 'stable' | 'no_data';
+  history_by_workout: WorkoutSetGroup[];
 }
 
-export interface WorkoutDetail {
-  id: number;
+export interface WorkoutSetGroup {
   date: string;
   day_type: string;
-  week: number | null;
-  phase: string;
-  energy_before: number | null;
-  energy_after: number | null;
-  sleep_hours: number | null;
-  sleep_quality: number | null;
-  back_pain: number | null;
-  emotional_wave: string;
-  notes: string;
   sets: WorkoutSetData[];
 }
 
 export interface WorkoutSetData {
-  id: number;
-  exercise_id: string;
-  exercise_name: string;
   set_number: number;
   weight: number;
   reps: number;
-  rpe: number | null;
+  rpe: number;
+}
+
+export interface NextWorkout {
+  next_day: string;
+  phase: {
+    current_week: number;
+    phase_name: string;
+    rpe_min: number;
+    rpe_max: number;
+    sets_modifier: number;
+  };
+  exercises: Exercise[];
+}
+
+export interface IncomeStats {
+  month: number;
+  year: number;
+  days: IncomeDay[];
+  total_income: number;
+  total_hours: number;
+  base_hourly_rate: number;
+}
+
+export interface IncomeDay {
+  day: number;
+  date: string;
+  total: number;
+  salary: number;
+  tips: number;
+  other: number;
+  hours: number;
+  transactions: IncomeTx[];
+}
+
+export interface IncomeTx {
+  id: number;
+  amount: number;
+  currency: string;
+  category: string;
+  comment: string;
+  hours: number | null;
+}
+
+export interface WeeklySummary {
+  from_date: string;
+  to_date: string;
+  days_back: number;
+  total_income: number;
+  total_expense: number;
+  balance: number;
+  expense_by_category: Record<string, number>;
+  transaction_count: number;
 }
 
 // Advisor types
-export interface AdvisorMessage {
-  role: 'user' | 'ai';
-  text: string;
-}
-
 export interface AdvisorResponse {
   response: string;
-}
-
-// Recurring transactions
-export interface RecurringTransaction {
-  id: number;
-  name: string;
-  type: string;
-  account: string;
-  category: string;
-  amount: number;
-  currency: string;
-  frequency: string;
-  next_date: string;
-  is_active: boolean;
-}
-
-export interface RecurringTransactionCreate {
-  name: string;
-  type: string;
-  account: string;
-  category?: string;
-  amount: number;
-  currency?: string;
-  frequency: string;
-  next_date: string;
-}
-
-export interface References {
-  types: string[];
-  accounts: string[];
-  categories: string[];
-  income_categories: string[];
-}
-
-// Stats types
-export interface DailySpending {
-  date: string;
-  total: number;
-  by_category: Record<string, number>;
-}
-
-// Calendar types
-export interface WorkoutCalendarEntry {
-  date: string;
-  day_type: string;
-  id: number;
 }

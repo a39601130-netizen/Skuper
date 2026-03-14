@@ -414,9 +414,12 @@ async def get_daily_spending(db: AsyncSession) -> List[Dict[str, Any]]:
 
 
 def _tx_to_dict(tx: Transaction) -> Dict[str, Any]:
+    tx_date = tx.date
     return {
         "id": tx.id,
-        "date": tx.date.isoformat(),
+        "date": tx_date.isoformat(),
+        "day": tx_date.day,
+        "full_date": tx_date.strftime("%d.%m.%Y"),
         "type": tx.type,
         "account": tx.account.name if tx.account else "",
         "category": tx.category.name if tx.category else "",

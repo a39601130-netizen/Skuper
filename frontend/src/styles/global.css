@@ -280,3 +280,36 @@ a {
   text-align: right;
   flex-shrink: 0;
 }
+
+/* Delete button */
+.btn-delete {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.btn-delete:active {
+  opacity: 1;
+}
+
+/* Disabled state */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Input styling */
+input[type="text"],
+input[type="number"] {
+  outline: none;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus {
+  border-color: var(--accent);
+}

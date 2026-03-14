@@ -10,14 +10,9 @@ import type {
   NextWorkout,
   AdvisorResponse,
   References,
-  WorkoutCreate,
-  WorkoutComplete,
-  WorkoutSetCreate,
-  WorkoutDetail,
-  DailySpending,
-  WorkoutCalendarEntry,
-  RecurringTransaction,
-  RecurringTransactionCreate,
+  IncomeStats,
+  WeeklySummary,
+  ExerciseProgress,
 } from '../types';
 
 const API_BASE = '/api';
@@ -45,19 +40,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 // --- Transactions ---
-export const getTransactions = (limit = 20, filters?: {
-  date_from?: string; date_to?: string; category?: string; type?: string; account?: string;
-}) => {
-  const params = new URLSearchParams({ limit: String(limit) });
-  if (filters) {
-    if (filters.date_from) params.set('date_from', filters.date_from);
-    if (filters.date_to) params.set('date_to', filters.date_to);
-    if (filters.category) params.set('category', filters.category);
-    if (filters.type) params.set('type', filters.type);
-    if (filters.account) params.set('account', filters.account);
-  }
-  return request<Transaction[]>(`/transactions?${params}`);
-};
+export const getTransactions = (limit = 20) =>
+  request<Transaction[]>(`/transactions?limit=${limit}`);
 
 export const createTransaction = (data: TransactionCreate) =>
   request<{ status: string; id: number }>('/transactions', {
@@ -65,8 +49,8 @@ export const createTransaction = (data: TransactionCreate) =>
     body: JSON.stringify(data),
   });
 
-export const deleteTransaction = (id: number) =>
-  request<{ status: string }>(`/transactions/${id}`, { method: 'DELETE' });
+export const deleteTransaction = (txId: number) =>
+  request<{ status: string }>(`/transactions/${txId}`, { method: 'DELETE' });
 
 // --- Accounts ---
 export const getAccounts = () => request<Account[]>('/accounts');
@@ -77,10 +61,9 @@ export const getReferences = () => request<References>('/categories/references')
 
 // --- Stats ---
 export const getMonthlySummary = () => request<MonthlySummary>('/stats/monthly');
-export const getIncomeStats = () => request<Record<string, unknown>>('/stats/income');
+export const getIncomeStats = () => request<IncomeStats>('/stats/income');
 export const getWeeklySummary = (daysBack = 7) =>
-  request<Record<string, unknown>>(`/stats/weekly?days_back=${daysBack}`);
-export const getDailySpending = () => request<DailySpending[]>('/stats/daily-spending');
+  request<WeeklySummary>(`/stats/weekly?days_back=${daysBack}`);
 
 // --- Workouts ---
 export const getWorkoutHistory = (limit = 10) =>
@@ -89,83 +72,19 @@ export const getWorkoutHistory = (limit = 10) =>
 export const getNextWorkout = () => request<NextWorkout>('/workouts/next');
 export const getCurrentWeights = () => request<ExerciseWeight[]>('/workouts/weights');
 
-export const createWorkout = (data: WorkoutCreate) =>
-  request<WorkoutDetail>('/workouts', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-
-export const getWorkout = (id: number) =>
-  request<WorkoutDetail>(`/workouts/${id}`);
-
-export const completeWorkout = (id: number, data: WorkoutComplete) =>
-  request<WorkoutDetail>(`/workouts/${id}/complete`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  });
-
-export const addWorkoutSet = (workoutId: number, data: WorkoutSetCreate) =>
-  request<{ status: string; id: number }>(`/workouts/${workoutId}/sets`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-
-export const getWorkoutCalendar = (month: number, year: number) =>
-  request<WorkoutCalendarEntry[]>(`/workouts/calendar?month=${month}&year=${year}`);
-
-export const getWorkoutComparison = (id: number) =>
-  request<{ current: WorkoutDetail; previous: WorkoutDetail | null }>(`/workouts/${id}/compare`);
-
 // --- Exercises ---
 export const getExercises = (day?: 'A' | 'B') =>
   request<Exercise[]>(`/exercises${day ? `?day=${day}` : ''}`);
 
 export const getExerciseProgress = (exerciseId: string) =>
-  request<Record<string, unknown>>(`/exercises/${exerciseId}/progress`);
-
-export const updateExerciseWeight = (exerciseId: string, weight: number) =>
-  request<{ status: string }>(`/exercises/${exerciseId}/weight`, {
-    method: 'PUT',
-    body: JSON.stringify({ weight }),
-  });
+  request<ExerciseProgress>(`/exercises/${exerciseId}/progress`);
 
 // --- Advisor ---
-export const askAdvisor = (
-  question: string,
-  contextType = 'finance',
-  mode = 'default',
-  screenContext?: string,
-  history?: { role: string; text: string }[],
-) =>
+export const askAdvisor = (question: string, contextType = 'finance', mode = 'default') =>
   request<AdvisorResponse>('/advisor/ask', {
     method: 'POST',
-    body: JSON.stringify({
-      question,
-      context_type: contextType,
-      mode,
-      screen_context: screenContext,
-      history,
-    }),
+    body: JSON.stringify({ question, context_type: contextType, mode }),
   });
 
 export const getAnalysis = (type = 'finance') =>
   request<{ response: string; summary: MonthlySummary }>(`/advisor/analysis?type=${type}`);
-
-export const getInsights = () =>
-  request<{ insights: string[] }>('/advisor/insights');
-
-// --- Recurring Transactions ---
-export const getRecurringTransactions = () =>
-  request<RecurringTransaction[]>('/recurring');
-
-export const createRecurringTransaction = (data: RecurringTransactionCreate) =>
-  request<RecurringTransaction>('/recurring', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-
-export const deleteRecurringTransaction = (id: number) =>
-  request<{ status: string }>(`/recurring/${id}`, { method: 'DELETE' });
-
-export const applyRecurringTransaction = (id: number) =>
-  request<{ status: string; transaction_id: number }>(`/recurring/${id}/apply`, { method: 'POST' });

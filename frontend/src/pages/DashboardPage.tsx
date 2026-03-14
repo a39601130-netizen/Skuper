@@ -1,40 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getMonthlySummary, getIncomeStats } from '../api/client';
+import { getMonthlySummary } from '../api/client';
 import type { MonthlySummary } from '../types';
-import ExpensePieChart from '../components/charts/ExpensePieChart';
-import SpendingTrendChart from '../components/charts/SpendingTrendChart';
-import InsightsCard from '../components/InsightsCard';
-import RecurringTransactionsList from '../components/RecurringTransactionsList';
 
 function formatMoney(value: number, currency = 'BYN'): string {
   return `${value.toFixed(2)} ${currency}`;
 }
 
-interface IncomeDay {
-  day: number;
-  date: string;
-  total: number;
-  salary: number;
-  tips: number;
-  other: number;
-  hours: number;
-  transactions: { id: number; amount: number; currency: string; category: string; comment: string; hours: number | null }[];
-}
-
-interface IncomeStats {
-  month: number;
-  year: number;
-  days: IncomeDay[];
-  total_income: number;
-  total_hours: number;
-  base_hourly_rate: number;
-}
-
 export default function DashboardPage() {
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
-  const [incomeStats, setIncomeStats] = useState<IncomeStats | null>(null);
-  const [showIncome, setShowIncome] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -75,65 +49,17 @@ export default function DashboardPage() {
     <div className="page">
       <h1 className="page-title">Финансы</h1>
 
-      {/* Сводка */}
+      {/* Summary */}
       <div className="grid-2">
-        <div className="card" onClick={() => {
-          if (!incomeStats) {
-            getIncomeStats().then((d) => setIncomeStats(d as unknown as IncomeStats)).catch(() => {});
-          }
-          setShowIncome(!showIncome);
-        }} style={{ cursor: 'pointer' }}>
-          <div className="card-title">Доходы {showIncome ? '▲' : '▼'}</div>
+        <div className="card" style={{ cursor: 'pointer' }} onClick={() => navigate('/income')}>
+          <div className="card-title">Доходы</div>
           <div className="stat-value amount income">{formatMoney(summary.total_income)}</div>
         </div>
-        <div className="card">
+        <div className="card" style={{ cursor: 'pointer' }} onClick={() => navigate('/report')}>
           <div className="card-title">Расходы</div>
           <div className="stat-value amount expense">{formatMoney(summary.total_expense)}</div>
         </div>
       </div>
-
-      {/* Доходы по дням */}
-      {showIncome && incomeStats && (
-        <div className="card">
-          <div className="card-title">Доходы по дням</div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, fontSize: 13 }}>
-            <span>Всего часов: <strong>{incomeStats.total_hours.toFixed(1)}</strong></span>
-            <span>Ставка: <strong>{incomeStats.base_hourly_rate} BYN/ч</strong></span>
-          </div>
-          {incomeStats.days.length === 0 && (
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Нет доходов за этот месяц</div>
-          )}
-          {incomeStats.days.map((day) => (
-            <div key={day.date} style={{
-              padding: '10px 0', borderBottom: '1px solid var(--border)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontWeight: 600 }}>{day.date}</span>
-                <span className="amount income" style={{ fontWeight: 600 }}>
-                  {formatMoney(day.total)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text-secondary)' }}>
-                {day.salary > 0 && <span>Зарплата: {day.salary.toFixed(0)}</span>}
-                {day.tips > 0 && <span>Чаевые: {day.tips.toFixed(0)}</span>}
-                {day.other > 0 && <span>Другое: {day.other.toFixed(0)}</span>}
-                {day.hours > 0 && <span>{day.hours}ч</span>}
-              </div>
-              {day.transactions.length > 1 && (
-                <div style={{ marginTop: 4 }}>
-                  {day.transactions.map((tx) => (
-                    <div key={tx.id} style={{ fontSize: 11, color: 'var(--text-secondary)', paddingLeft: 8 }}>
-                      {tx.category || 'Доход'}: {tx.amount} {tx.currency}
-                      {tx.comment && ` — ${tx.comment}`}
-                      {tx.hours && ` (${tx.hours}ч)`}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
 
       <div className="card">
         <div className="card-title">Баланс</div>
@@ -141,39 +67,45 @@ export default function DashboardPage() {
         <div className="stat-label">На счетах: {formatMoney(summary.total_on_accounts)}</div>
       </div>
 
-      {/* Счета (группировка по валюте) */}
+      {/* Accounts */}
       <div className="card">
         <div className="card-title">Счета</div>
-        {(() => {
-          const byCurrency: Record<string, typeof summary.accounts> = {};
-          for (const acc of summary.accounts) {
-            if (!byCurrency[acc.currency]) byCurrency[acc.currency] = [];
-            byCurrency[acc.currency].push(acc);
-          }
-          return Object.entries(byCurrency).map(([currency, accs]) => (
-            <div key={currency}>
-              {Object.keys(byCurrency).length > 1 && (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8, marginBottom: 4 }}>
-                  {currency} — итого: {formatMoney(accs.reduce((s, a) => s + a.current, 0), currency)}
-                </div>
-              )}
-              {accs.map((acc) => (
-                <div className="list-item" key={acc.name}>
-                  <span className="list-item-icon">{acc.emoji || '💳'}</span>
-                  <div className="list-item-content">
-                    <div className="list-item-title">{acc.name}</div>
-                  </div>
-                  <div className="list-item-right">
-                    <span className="amount">{formatMoney(acc.current, acc.currency)}</span>
-                  </div>
-                </div>
-              ))}
+        {summary.accounts.map((acc) => (
+          <div className="list-item" key={acc.name}>
+            <span className="list-item-icon">{acc.emoji || '💳'}</span>
+            <div className="list-item-content">
+              <div className="list-item-title">{acc.name}</div>
             </div>
-          ));
-        })()}
+            <div className="list-item-right">
+              <span className="amount">{formatMoney(acc.current, acc.currency)}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Категории расходов с бюджетами */}
+      {/* Budget warnings */}
+      {summary.over_budget.length > 0 && (
+        <div className="card" style={{ borderLeft: '3px solid var(--danger)' }}>
+          <div className="card-title" style={{ color: 'var(--danger)' }}>Бюджет превышен</div>
+          {summary.over_budget.map((cat) => (
+            <div key={cat.name} style={{ marginBottom: 4 }}>
+              {cat.emoji} {cat.name}: {cat.spent.toFixed(0)} / {cat.budget.toFixed(0)} BYN
+            </div>
+          ))}
+        </div>
+      )}
+      {summary.near_limit.length > 0 && (
+        <div className="card" style={{ borderLeft: '3px solid var(--warning)' }}>
+          <div className="card-title" style={{ color: 'var(--warning)' }}>Близко к лимиту</div>
+          {summary.near_limit.map((cat) => (
+            <div key={cat.name} style={{ marginBottom: 4 }}>
+              {cat.emoji} {cat.name}: {cat.spent.toFixed(0)} / {cat.budget.toFixed(0)} BYN
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Expense categories */}
       {expenseCategories.length > 0 && (
         <div className="card">
           <div className="card-title">Расходы по категориям</div>
@@ -200,17 +132,16 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Графики */}
-      <ExpensePieChart categories={summary.categories} />
-      <SpendingTrendChart />
+      {/* Quick links */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => navigate('/income')}>
+          💰 Доходы
+        </button>
+        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => navigate('/report')}>
+          📋 Отчёт
+        </button>
+      </div>
 
-      {/* AI инсайты */}
-      <InsightsCard />
-
-      {/* Повторяющиеся транзакции */}
-      <RecurringTransactionsList />
-
-      {/* Быстрое добавление */}
       <button className="btn btn-primary btn-full" onClick={() => navigate('/add')}>
         ➕ Добавить транзакцию
       </button>

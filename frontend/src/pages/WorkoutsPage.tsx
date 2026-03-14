@@ -7,6 +7,7 @@ import WorkoutCalendar from '../components/workout/WorkoutCalendar';
 import WorkoutComparison from '../components/workout/WorkoutComparison';
 
 export default function WorkoutsPage() {
+  const navigate = useNavigate();
   const [weights, setWeights] = useState<ExerciseWeight[]>([]);
   const [next, setNext] = useState<NextWorkout | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +27,18 @@ export default function WorkoutsPage() {
   return (
     <div className="page">
       <h1 className="page-title">Тренировки</h1>
+
+      {/* Quick links */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13 }}
+          onClick={() => navigate('/workout-history')}>
+          📜 История
+        </button>
+        <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13 }}
+          onClick={() => navigate('/exercise-progress')}>
+          📊 Прогресс
+        </button>
+      </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -50,6 +63,7 @@ export default function WorkoutsPage() {
             {next.phase && (
               <div className="stat-label">
                 Фаза: {next.phase.phase_name || '—'} · Неделя {next.phase.current_week || '?'}
+                {next.phase.rpe_min > 0 && ` · RPE ${next.phase.rpe_min}-${next.phase.rpe_max}`}
               </div>
             )}
           </div>

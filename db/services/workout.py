@@ -102,43 +102,48 @@ async def get_current_week_and_phase(db: AsyncSession) -> Dict:
 
 async def get_exercise_progress(db: AsyncSession, exercise_id: str) -> Dict:
     """Прогресс упражнения: история весов."""
-    # Последние 10 подходов по данному упражнению
     result = await db.execute(
-        select(WorkoutSet)
+        select(WorkoutSet, Workout.date, Workout.day_type)
         .join(Workout, WorkoutSet.workout_id == Workout.id)
         .where(WorkoutSet.exercise_id == exercise_id)
         .order_by(desc(Workout.date), WorkoutSet.set_number)
         .limit(30)
     )
-    sets = list(result.scalars().all())
+    rows = result.all()
 
-    if not sets:
-        return {"exercise_id": exercise_id, "sets": [], "trend": "no_data"}
-
-    # Получаем даты тренировок
-    workout_ids_list = list({s.workout_id for s in sets})
-    workout_dates: Dict[int, str] = {}
-    if workout_ids_list:
-        w_result = await db.execute(
-            select(Workout).where(Workout.id.in_(workout_ids_list))
-        )
-        for w in w_result.scalars().all():
-            workout_dates[w.id] = w.date.isoformat()
+    if not rows:
+        return {
+            "exercise_id": exercise_id,
+            "current_weight": 0,
+            "target_reps": "",
+            "status": "",
+            "trend": "no_data",
+            "history_by_workout": [],
+        }
 
     # Агрегируем по тренировкам
-    by_workout: Dict[int, List] = {}
-    for s in sets:
-        if s.workout_id not in by_workout:
-            by_workout[s.workout_id] = []
-        by_workout[s.workout_id].append({"weight": s.weight, "reps": s.reps, "rpe": s.rpe})
+    by_workout: Dict[int, Dict] = {}
+    for ws, w_date, w_day_type in rows:
+        if ws.workout_id not in by_workout:
+            by_workout[ws.workout_id] = {
+                "date": w_date.isoformat(),
+                "day_type": w_day_type,
+                "sets": [],
+            }
+        by_workout[ws.workout_id]["sets"].append({
+            "set_number": ws.set_number,
+            "weight": ws.weight,
+            "reps": ws.reps,
+            "rpe": ws.rpe,
+        })
 
     # Тренд: последние 3 тренировки
     workout_ids = list(by_workout.keys())
     recent = workout_ids[:3]
     trend = "stable"
     if len(recent) >= 2:
-        last_w = max(s["weight"] for s in by_workout[recent[0]])
-        prev_w = max(s["weight"] for s in by_workout[recent[1]])
+        last_w = max(s["weight"] for s in by_workout[recent[0]]["sets"])
+        prev_w = max(s["weight"] for s in by_workout[recent[1]]["sets"])
         if last_w > prev_w:
             trend = "up"
         elif last_w < prev_w:
@@ -156,8 +161,7 @@ async def get_exercise_progress(db: AsyncSession, exercise_id: str) -> Dict:
         "status": cw.status if cw else "",
         "trend": trend,
         "history_by_workout": [
-            {"workout_id": wid, "date": workout_dates.get(wid, ""), "sets": by_workout[wid]}
-            for wid in workout_ids[:10]
+            by_workout[wid] for wid in workout_ids[:10]
         ],
     }
 
@@ -195,157 +199,6 @@ async def update_current_weight(
     return cw
 
 
-async def create_workout(
-    db: AsyncSession,
-    day_type: str,
-    energy_before: int,
-    sleep_hours: Optional[float] = None,
-    sleep_quality: Optional[int] = None,
-    back_pain: Optional[int] = None,
-    emotional_wave: Optional[str] = None,
-) -> Workout:
-    """Создать новую тренировку."""
-    phase_info = await get_current_week_and_phase(db)
-    workout = Workout(
-        date=date.today(),
-        day_type=day_type,
-        week=phase_info.get("current_week"),
-        phase=phase_info.get("phase_name"),
-        energy_before=energy_before,
-        sleep_hours=sleep_hours,
-        sleep_quality=sleep_quality,
-        back_pain=back_pain,
-        emotional_wave=emotional_wave,
-    )
-    db.add(workout)
-    await db.commit()
-    await db.refresh(workout)
-    return workout
-
-
-async def complete_workout(
-    db: AsyncSession,
-    workout_id: int,
-    energy_after: int,
-    notes: Optional[str] = None,
-) -> Optional[Workout]:
-    """Завершить тренировку."""
-    result = await db.execute(select(Workout).where(Workout.id == workout_id))
-    workout = result.scalar_one_or_none()
-    if not workout:
-        return None
-    workout.energy_after = energy_after
-    workout.notes = notes
-    await db.commit()
-    await db.refresh(workout)
-    return workout
-
-
-async def add_workout_set(
-    db: AsyncSession,
-    workout_id: int,
-    exercise_id: str,
-    set_number: int,
-    weight: float,
-    reps: int,
-    rpe: Optional[int] = None,
-    notes: Optional[str] = None,
-) -> WorkoutSet:
-    """Добавить подход к тренировке."""
-    ws = WorkoutSet(
-        workout_id=workout_id,
-        exercise_id=exercise_id,
-        set_number=set_number,
-        weight=weight,
-        reps=reps,
-        rpe=rpe,
-        notes=notes,
-    )
-    db.add(ws)
-    await db.commit()
-    await db.refresh(ws)
-    return ws
-
-
-async def get_workout_with_sets(db: AsyncSession, workout_id: int) -> Optional[Dict]:
-    """Получить тренировку с подходами."""
-    result = await db.execute(
-        select(Workout)
-        .options(selectinload(Workout.sets))
-        .where(Workout.id == workout_id)
-    )
-    workout = result.scalar_one_or_none()
-    if not workout:
-        return None
-
-    # Получим имена упражнений
-    exercise_ids = list({s.exercise_id for s in workout.sets})
-    ex_names: Dict[str, str] = {}
-    if exercise_ids:
-        ex_result = await db.execute(
-            select(Exercise).where(Exercise.exercise_id.in_(exercise_ids))
-        )
-        for ex in ex_result.scalars().all():
-            ex_names[ex.exercise_id] = ex.name
-
-    return {
-        **_workout_to_dict(workout),
-        "sleep_quality": workout.sleep_quality,
-        "sets": [
-            {
-                "id": s.id,
-                "exercise_id": s.exercise_id,
-                "exercise_name": ex_names.get(s.exercise_id, s.exercise_id),
-                "set_number": s.set_number,
-                "weight": s.weight,
-                "reps": s.reps,
-                "rpe": s.rpe,
-            }
-            for s in sorted(workout.sets, key=lambda x: (x.exercise_id, x.set_number))
-        ],
-    }
-
-
-async def get_workouts_for_month(db: AsyncSession, month: int, year: int) -> List[Dict]:
-    """Тренировки за месяц для календаря."""
-    from sqlalchemy import extract as sa_extract
-    result = await db.execute(
-        select(Workout)
-        .where(
-            sa_extract("month", Workout.date) == month,
-            sa_extract("year", Workout.date) == year,
-        )
-        .order_by(Workout.date)
-    )
-    workouts = result.scalars().all()
-    return [
-        {"date": w.date.isoformat(), "day_type": w.day_type, "id": w.id}
-        for w in workouts
-    ]
-
-
-async def get_workout_comparison(db: AsyncSession, workout_id: int) -> Dict:
-    """Сравнить тренировку с предыдущей такого же типа."""
-    current = await get_workout_with_sets(db, workout_id)
-    if not current:
-        return {"current": None, "previous": None}
-
-    # Найти предыдущую тренировку того же типа
-    result = await db.execute(
-        select(Workout)
-        .where(
-            Workout.day_type == current["day_type"],
-            Workout.id < workout_id,
-        )
-        .order_by(desc(Workout.id))
-        .limit(1)
-    )
-    prev_workout = result.scalar_one_or_none()
-    previous = await get_workout_with_sets(db, prev_workout.id) if prev_workout else None
-
-    return {"current": current, "previous": previous}
-
-
 def _exercise_to_dict(e: Exercise) -> Dict:
     return {
         "exercise_id": e.exercise_id,
@@ -354,10 +207,6 @@ def _exercise_to_dict(e: Exercise) -> Dict:
         "order": e.order,
         "category": e.category or "",
         "weight_step": e.weight_step,
-        "reps_min": e.reps_min,
-        "reps_max": e.reps_max,
-        "rest_seconds": e.rest_seconds,
-        "default_sets": e.default_sets,
     }
 
 
@@ -381,7 +230,8 @@ def _workout_to_dict(w: Workout) -> Dict:
         "energy_before": w.energy_before,
         "energy_after": w.energy_after,
         "sleep_hours": w.sleep_hours,
-        "back_pain": w.back_pain,
+        "sleep_quality": w.sleep_quality or "",
+        "back_pain": w.back_pain or "",
         "emotional_wave": w.emotional_wave or "",
         "notes": w.notes or "",
     }
