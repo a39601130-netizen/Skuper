@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMonthlySummary } from '../api/client';
 import type { MonthlySummary } from '../types';
+import ExpensePieChart from '../components/charts/ExpensePieChart';
+import SpendingTrendChart from '../components/charts/SpendingTrendChart';
+import InsightsCard from '../components/InsightsCard';
+import RecurringTransactionsList from '../components/RecurringTransactionsList';
 
 function formatMoney(value: number, currency = 'BYN'): string {
   return `${value.toFixed(2)} ${currency}`;
@@ -67,20 +71,36 @@ export default function DashboardPage() {
         <div className="stat-label">На счетах: {formatMoney(summary.total_on_accounts)}</div>
       </div>
 
-      {/* Счета */}
+      {/* Счета (группировка по валюте) */}
       <div className="card">
         <div className="card-title">Счета</div>
-        {summary.accounts.map((acc) => (
-          <div className="list-item" key={acc.name}>
-            <span className="list-item-icon">{acc.emoji || '💳'}</span>
-            <div className="list-item-content">
-              <div className="list-item-title">{acc.name}</div>
+        {(() => {
+          const byCurrency: Record<string, typeof summary.accounts> = {};
+          for (const acc of summary.accounts) {
+            if (!byCurrency[acc.currency]) byCurrency[acc.currency] = [];
+            byCurrency[acc.currency].push(acc);
+          }
+          return Object.entries(byCurrency).map(([currency, accs]) => (
+            <div key={currency}>
+              {Object.keys(byCurrency).length > 1 && (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8, marginBottom: 4 }}>
+                  {currency} — итого: {formatMoney(accs.reduce((s, a) => s + a.current, 0), currency)}
+                </div>
+              )}
+              {accs.map((acc) => (
+                <div className="list-item" key={acc.name}>
+                  <span className="list-item-icon">{acc.emoji || '💳'}</span>
+                  <div className="list-item-content">
+                    <div className="list-item-title">{acc.name}</div>
+                  </div>
+                  <div className="list-item-right">
+                    <span className="amount">{formatMoney(acc.current, acc.currency)}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="list-item-right">
-              <span className="amount">{formatMoney(acc.current, acc.currency)}</span>
-            </div>
-          </div>
-        ))}
+          ));
+        })()}
       </div>
 
       {/* Категории расходов с бюджетами */}
@@ -109,6 +129,16 @@ export default function DashboardPage() {
           })}
         </div>
       )}
+
+      {/* Графики */}
+      <ExpensePieChart categories={summary.categories} />
+      <SpendingTrendChart />
+
+      {/* AI инсайты */}
+      <InsightsCard />
+
+      {/* Повторяющиеся транзакции */}
+      <RecurringTransactionsList />
 
       {/* Быстрое добавление */}
       <button className="btn btn-primary btn-full" onClick={() => navigate('/add')}>

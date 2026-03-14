@@ -108,17 +108,36 @@ async def add_transaction(
     return tx
 
 
-async def get_recent_transactions(db: AsyncSession, limit: int = 20) -> List[Dict[str, Any]]:
-    result = await db.execute(
+async def get_recent_transactions(
+    db: AsyncSession,
+    limit: int = 20,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    category: Optional[str] = None,
+    trans_type: Optional[str] = None,
+    account_name: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    q = (
         select(Transaction)
         .options(
             selectinload(Transaction.account),
             selectinload(Transaction.category),
             selectinload(Transaction.to_account),
         )
-        .order_by(Transaction.date.desc(), Transaction.id.desc())
-        .limit(limit)
     )
+    if date_from:
+        q = q.where(Transaction.date >= date_from)
+    if date_to:
+        q = q.where(Transaction.date <= date_to)
+    if trans_type:
+        q = q.where(Transaction.type == trans_type)
+    if category:
+        q = q.join(Transaction.category).where(Category.name == category)
+    if account_name:
+        q = q.join(Transaction.account).where(Account.name == account_name)
+
+    q = q.order_by(Transaction.date.desc(), Transaction.id.desc()).limit(limit)
+    result = await db.execute(q)
     txs = result.scalars().all()
     return [_tx_to_dict(tx) for tx in txs]
 
@@ -337,6 +356,61 @@ async def get_weekly_summary(db: AsyncSession, days_back: int = 7) -> Dict[str, 
         "expense_by_category": by_category,
         "transaction_count": len(txs),
     }
+
+
+async def get_category_spending(db: AsyncSession) -> Dict[str, float]:
+    """Расходы по категориям за текущий месяц."""
+    today = date.today()
+    month, year = today.month, today.year
+
+    result = await db.execute(
+        select(Transaction)
+        .options(selectinload(Transaction.category))
+        .where(
+            Transaction.type == "Расход",
+            extract("month", Transaction.date) == month,
+            extract("year", Transaction.date) == year,
+        )
+    )
+    txs = list(result.scalars().all())
+
+    spending: Dict[str, float] = {}
+    for tx in txs:
+        byn_amount = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
+        cat_name = tx.category.name if tx.category else "Другое"
+        spending[cat_name] = spending.get(cat_name, 0.0) + byn_amount
+
+    return spending
+
+
+async def get_daily_spending(db: AsyncSession) -> List[Dict[str, Any]]:
+    """Расходы по дням за текущий месяц."""
+    today = date.today()
+    month, year = today.month, today.year
+
+    result = await db.execute(
+        select(Transaction)
+        .options(selectinload(Transaction.category))
+        .where(
+            Transaction.type == "Расход",
+            extract("month", Transaction.date) == month,
+            extract("year", Transaction.date) == year,
+        )
+        .order_by(Transaction.date)
+    )
+    txs = list(result.scalars().all())
+
+    by_day: Dict[str, Dict[str, Any]] = {}
+    for tx in txs:
+        day_key = tx.date.isoformat()
+        if day_key not in by_day:
+            by_day[day_key] = {"date": day_key, "total": 0.0, "by_category": {}}
+        byn = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
+        by_day[day_key]["total"] += byn
+        cat_name = tx.category.name if tx.category else "Другое"
+        by_day[day_key]["by_category"][cat_name] = by_day[day_key]["by_category"].get(cat_name, 0.0) + byn
+
+    return list(by_day.values())
 
 
 def _tx_to_dict(tx: Transaction) -> Dict[str, Any]:

@@ -92,6 +92,10 @@ class Exercise(Base):
     order: Mapped[int] = mapped_column(Integer, default=0)
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     weight_step: Mapped[float] = mapped_column(Float, default=2.5)
+    reps_min: Mapped[int] = mapped_column(Integer, default=8)
+    reps_max: Mapped[int] = mapped_column(Integer, default=12)
+    rest_seconds: Mapped[int] = mapped_column(Integer, default=90)
+    default_sets: Mapped[int] = mapped_column(Integer, default=3)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     current_weight: Mapped[Optional["CurrentWeight"]] = relationship(
@@ -169,6 +173,29 @@ class CurrentWeight(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     exercise: Mapped["Exercise"] = relationship(back_populates="current_weight")
+
+
+# ============================================
+# ПОВТОРЯЮЩИЕСЯ ТРАНЗАКЦИИ
+# ============================================
+
+class RecurringTransaction(Base):
+    __tablename__ = "recurring_transactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    type: Mapped[str] = mapped_column(String(30))
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
+    category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id"), nullable=True)
+    amount: Mapped[float] = mapped_column(Float)
+    currency: Mapped[str] = mapped_column(String(10), default="BYN")
+    frequency: Mapped[str] = mapped_column(String(20))  # daily / weekly / monthly
+    next_date: Mapped[date] = mapped_column(Date)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    account: Mapped["Account"] = relationship("Account", foreign_keys=[account_id])
+    category: Mapped[Optional["Category"]] = relationship("Category", foreign_keys=[category_id])
 
 
 # ============================================

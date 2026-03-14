@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
 from db.database import get_db
-from db.services.finance import get_categories, get_accounts
+from db.services.finance import get_categories, get_accounts, get_category_spending
 
 router = APIRouter(prefix="/api/categories", tags=["categories"])
 
@@ -16,15 +16,16 @@ async def list_categories(
     db: AsyncSession = Depends(get_db),
 ):
     cats = await get_categories(db)
+    spending = await get_category_spending(db)
     return [
         {
             "name": c.name,
             "type": c.type,
             "emoji": c.emoji or "📦",
             "budget": c.budget_limit,
-            "spent": 0.0,
-            "remaining": c.budget_limit,
-            "progress": 0.0,
+            "spent": spending.get(c.name, 0.0),
+            "remaining": max(0.0, c.budget_limit - spending.get(c.name, 0.0)) if c.budget_limit > 0 else 0.0,
+            "progress": spending.get(c.name, 0.0) / c.budget_limit if c.budget_limit > 0 else 0.0,
         }
         for c in cats
     ]

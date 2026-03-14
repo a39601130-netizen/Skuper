@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getCurrentWeights, getNextWorkout } from '../api/client';
 import type { ExerciseWeight, NextWorkout } from '../types';
+import ExerciseProgressChart from '../components/charts/ExerciseProgressChart';
+import WorkoutCalendar from '../components/workout/WorkoutCalendar';
+import WorkoutComparison from '../components/workout/WorkoutComparison';
 
 export default function WorkoutsPage() {
   const [weights, setWeights] = useState<ExerciseWeight[]>([]);
   const [next, setNext] = useState<NextWorkout | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'next' | 'weights'>('next');
+  const [tab, setTab] = useState<'next' | 'weights' | 'progress' | 'calendar'>('next');
+  const [compareId, setCompareId] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     Promise.all([getCurrentWeights(), getNextWorkout()])
@@ -22,15 +28,15 @@ export default function WorkoutsPage() {
       <h1 className="page-title">Тренировки</h1>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <button className={`btn ${tab === 'next' ? 'btn-primary' : 'btn-ghost'}`}
-          onClick={() => setTab('next')}>
-          Следующая
-        </button>
-        <button className={`btn ${tab === 'weights' ? 'btn-primary' : 'btn-ghost'}`}
-          onClick={() => setTab('weights')}>
-          Веса
-        </button>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+        {(['next', 'weights', 'progress', 'calendar'] as const).map((t) => (
+          <button key={t}
+            className={`btn ${tab === t ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ fontSize: 13, padding: '6px 12px' }}
+            onClick={() => { setTab(t); setCompareId(null); }}>
+            {{ next: 'План', weights: 'Веса', progress: 'Графики', calendar: 'Календарь' }[t]}
+          </button>
+        ))}
       </div>
 
       {/* Next Workout */}
@@ -63,6 +69,11 @@ export default function WorkoutsPage() {
               </div>
             ))}
           </div>
+
+          <button className="btn btn-primary btn-full" style={{ marginTop: 12 }}
+            onClick={() => navigate('/workout/session')}>
+            Начать тренировку
+          </button>
         </>
       )}
 
@@ -94,6 +105,28 @@ export default function WorkoutsPage() {
             );
           })}
         </>
+      )}
+
+      {/* Progress Charts */}
+      {tab === 'progress' && weights.length > 0 && (
+        <>
+          {weights.slice(0, 6).map((w) => (
+            <ExerciseProgressChart
+              key={w.exercise_id}
+              exerciseId={w.exercise_id}
+              exerciseName={w.name}
+            />
+          ))}
+        </>
+      )}
+
+      {/* Calendar */}
+      {tab === 'calendar' && !compareId && (
+        <WorkoutCalendar onSelectWorkout={(id) => setCompareId(id)} />
+      )}
+
+      {tab === 'calendar' && compareId && (
+        <WorkoutComparison workoutId={compareId} onClose={() => setCompareId(null)} />
       )}
     </div>
   );

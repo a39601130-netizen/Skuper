@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
 from db.database import get_db
-from db.services.finance import get_monthly_summary, get_income_by_days, get_weekly_summary
+from db.services.finance import get_monthly_summary, get_income_by_days, get_weekly_summary, get_daily_spending
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
@@ -33,3 +33,11 @@ async def weekly_summary(
     db: AsyncSession = Depends(get_db),
 ):
     return await get_weekly_summary(db, days_back=days_back)
+
+
+@router.get("/daily-spending")
+async def daily_spending(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await get_daily_spending(db)

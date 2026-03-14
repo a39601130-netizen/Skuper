@@ -35,13 +35,19 @@ api/
   deps.py                        — get_current_user(), get_ai()
   routers/
     health.py                    — GET /api/health
-    transactions.py              — GET/POST/DELETE /api/transactions
+    transactions.py              — GET/POST/DELETE /api/transactions (с фильтрами, валидацией)
     accounts.py                  — GET /api/accounts
-    categories.py                — GET /api/categories, GET /api/categories/references
-    stats.py                     — GET /api/stats/monthly|income|weekly
-    workouts.py                  — GET /api/workouts/history|next|weights
-    exercises.py                 — GET /api/exercises, GET /api/exercises/{id}/progress
-    advisor.py                   — POST /api/advisor/ask, GET /api/advisor/analysis
+    categories.py                — GET /api/categories (реальные расходы), GET /api/categories/references
+    stats.py                     — GET /api/stats/monthly|income|weekly|daily-spending
+    workouts.py                  — GET/POST /api/workouts, PUT /api/workouts/{id}/complete,
+                                   POST /api/workouts/{id}/sets, GET /api/workouts/calendar,
+                                   GET /api/workouts/{id}/compare
+    exercises.py                 — GET /api/exercises, GET /api/exercises/{id}/progress,
+                                   PUT /api/exercises/{id}/weight
+    advisor.py                   — POST /api/advisor/ask, GET /api/advisor/analysis,
+                                   GET /api/advisor/insights
+    recurring.py                 — GET/POST /api/recurring, DELETE /api/recurring/{id},
+                                   POST /api/recurring/{id}/apply
 
 db/
   database.py                    — engine, async_session, Base, get_db(), init_db()
@@ -49,26 +55,50 @@ db/
                                    Workout, WorkoutSet, CurrentWeight, SheetsSyncLog
   seed.py                        — Начальные данные: счета, категории, фазы
   services/
-    finance.py                   — get_accounts, add_transaction, get_monthly_summary...
-    workout.py                   — get_exercises, determine_next_day, get_current_weights...
+    finance.py                   — get_accounts, add_transaction, get_monthly_summary,
+                                   get_category_spending, get_daily_spending...
+    workout.py                   — get_exercises, determine_next_day, get_current_weights,
+                                   create_workout, complete_workout, add_workout_set,
+                                   get_workout_with_sets, get_workouts_for_month,
+                                   get_workout_comparison...
+    recurring.py                 — CRUD повторяющихся транзакций + apply logic
 
 frontend/
   package.json                   — React 19, react-router-dom 7, Vite 6
   vite.config.ts                 — proxy /api → localhost:8000
   src/
     main.tsx                     — Инициализация Telegram WebApp, рендер App
-    App.tsx                      — Routes: 5 страниц
+    App.tsx                      — Routes: 6 страниц (+ /workout/session)
     api/client.ts                — Все API вызовы с X-Telegram-Init-Data заголовком
     hooks/useTelegram.ts         — useTelegram(): tg, user, haptic
-    components/BottomNav.tsx     — 5 вкладок навигации
+    components/
+      BottomNav.tsx              — 5 вкладок навигации
+      SwipeableListItem.tsx      — Свайп для удаления (touch events, 0 зависимостей)
+      InsightsCard.tsx           — AI инсайты на Dashboard
+      RecurringTransactionsList.tsx — Управление повторяющимися транзакциями
+      charts/
+        ExpensePieChart.tsx      — Pie chart расходов по категориям (recharts)
+        SpendingTrendChart.tsx   — Line chart расходов по дням (recharts)
+        ExerciseProgressChart.tsx — Line chart прогресса упражнения (recharts)
+      workout/
+        PreWorkoutForm.tsx       — Форма перед тренировкой (энергия, сон, боль, волна)
+        WarmupPhase.tsx          — 4 фазы разминки
+        SetInput.tsx             — Ввод веса × повторений
+        RPESelector.tsx          — Выбор RPE 1-10
+        RestTimer.tsx            — Таймер отдыха с HapticFeedback
+        WorkoutSummary.tsx       — Итоги тренировки
+        WorkoutCalendar.tsx      — Месячный календарь тренировок А/В
+        WorkoutComparison.tsx    — Сравнение тренировок side-by-side
     pages/
-      DashboardPage.tsx          — Сводка, счета, прогресс категорий
-      HistoryPage.tsx            — Последние транзакции с удалением
+      DashboardPage.tsx          — Сводка, счета (multi-currency), категории, графики,
+                                   AI инсайты, повторяющиеся транзакции
+      HistoryPage.tsx            — Транзакции с фильтрами и свайп-удалением
       AddTransactionPage.tsx     — Пошаговый ввод транзакции
-      WorkoutsPage.tsx           — Следующая тренировка + текущие веса
-      AdvisorPage.tsx            — AI советник (чат)
+      WorkoutsPage.tsx           — Табы: план/веса/графики/календарь, сравнение
+      AdvisorPage.tsx            — AI советник с localStorage историей и screen_context
+      WorkoutSessionPage.tsx     — Полная сессия: pre→warmup→упражнения→RPE→таймер→итоги
     styles/global.css            — Dark theme, CSS variables, mobile-first
-    types/index.ts               — TypeScript типы
+    types/index.ts               — TypeScript типы (Transaction, Workout, Recurring...)
 
 main.py                          — Telegram bot: create_application(), _register_handlers()
 bot/
@@ -113,11 +143,12 @@ Telegram Mini App присылает `X-Telegram-Init-Data` заголовок.
 - **Account**: id, name, balance, currency
 - **Category**: id, name, type (Расход/Доход/Перевод), emoji, budget_limit
 - **Transaction**: id, date, type, account_id, category_id, amount, comment, hours, synced_to_sheets
-- **Exercise**: id, exercise_id, name, day_type, muscle_group, equipment
-- **Phase**: id, phase_key, name, week_start, week_end, rpe_min, rpe_max, sets_modifier
-- **Workout**: id, date, day_type, energy_before, energy_after, notes, synced_to_sheets
+- **Exercise**: id, exercise_id, name, day (A/B), category, weight_step, reps_min, reps_max, rest_seconds, default_sets
+- **Phase**: id, name, weeks, rpe_min, rpe_max, sets_modifier
+- **Workout**: id, date, day_type, week, phase, energy_before, energy_after, sleep_hours, sleep_quality, back_pain, emotional_wave, notes
 - **WorkoutSet**: id, workout_id, exercise_id, set_number, weight, reps, rpe
-- **CurrentWeight**: id, exercise_id, current_weight, target_reps, status
+- **CurrentWeight**: id, exercise_id, weight, target_reps, last_sets (JSON), status
+- **RecurringTransaction**: id, name, type, account_id, category_id, amount, currency, frequency, next_date, is_active
 
 ## Ключевые константы (config.py)
 - `DATABASE_URL` — PostgreSQL connection string (asyncpg)

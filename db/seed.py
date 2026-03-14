@@ -53,12 +53,39 @@ INITIAL_PHASES = [
 ]
 
 
+INITIAL_EXERCISES = [
+    # День A — Верх (жим)
+    {"exercise_id": "bench_press", "name": "Жим лёжа", "day": "A", "order": 1,
+     "category": "Грудь", "weight_step": 2.5, "reps_min": 6, "reps_max": 10, "rest_seconds": 150, "default_sets": 3},
+    {"exercise_id": "ohp", "name": "Жим стоя", "day": "A", "order": 2,
+     "category": "Плечи", "weight_step": 2.5, "reps_min": 6, "reps_max": 10, "rest_seconds": 150, "default_sets": 3},
+    {"exercise_id": "incline_db_press", "name": "Жим гантелей на наклонной", "day": "A", "order": 3,
+     "category": "Грудь", "weight_step": 2.0, "reps_min": 8, "reps_max": 12, "rest_seconds": 90, "default_sets": 3},
+    {"exercise_id": "lateral_raise", "name": "Махи в стороны", "day": "A", "order": 4,
+     "category": "Плечи", "weight_step": 1.0, "reps_min": 12, "reps_max": 15, "rest_seconds": 60, "default_sets": 3},
+    {"exercise_id": "tricep_pushdown", "name": "Разгибания на трицепс", "day": "A", "order": 5,
+     "category": "Руки", "weight_step": 2.5, "reps_min": 10, "reps_max": 15, "rest_seconds": 60, "default_sets": 3},
+    # День B — Верх (тяга) + Ноги
+    {"exercise_id": "squat", "name": "Приседания", "day": "B", "order": 1,
+     "category": "Ноги", "weight_step": 2.5, "reps_min": 6, "reps_max": 10, "rest_seconds": 150, "default_sets": 3},
+    {"exercise_id": "barbell_row", "name": "Тяга штанги в наклоне", "day": "B", "order": 2,
+     "category": "Спина", "weight_step": 2.5, "reps_min": 6, "reps_max": 10, "rest_seconds": 150, "default_sets": 3},
+    {"exercise_id": "pulldown", "name": "Тяга верхнего блока", "day": "B", "order": 3,
+     "category": "Спина", "weight_step": 2.5, "reps_min": 8, "reps_max": 12, "rest_seconds": 90, "default_sets": 3},
+    {"exercise_id": "leg_curl", "name": "Сгибания ног", "day": "B", "order": 4,
+     "category": "Ноги", "weight_step": 2.5, "reps_min": 10, "reps_max": 15, "rest_seconds": 60, "default_sets": 3},
+    {"exercise_id": "bicep_curl", "name": "Сгибания на бицепс", "day": "B", "order": 5,
+     "category": "Руки", "weight_step": 1.0, "reps_min": 10, "reps_max": 15, "rest_seconds": 60, "default_sets": 3},
+]
+
+
 async def seed_db():
     """Seed all initial data if tables are empty."""
     async with async_session() as session:
         await _seed_accounts(session)
         await _seed_categories(session)
         await _seed_phases(session)
+        await _seed_exercises(session)
         await session.commit()
     logger.info("✅ Database seeded")
 
@@ -90,3 +117,21 @@ async def _seed_phases(session: AsyncSession):
     for data in INITIAL_PHASES:
         session.add(Phase(**data))
     logger.info(f"Seeded {len(INITIAL_PHASES)} phases")
+
+
+async def _seed_exercises(session: AsyncSession):
+    result = await session.execute(select(Exercise).limit(1))
+    if result.scalar_one_or_none():
+        return
+    for data in INITIAL_EXERCISES:
+        session.add(Exercise(**data))
+    # Начальные веса
+    for data in INITIAL_EXERCISES:
+        cw = CurrentWeight(
+            exercise_id=data["exercise_id"],
+            weight=0.0,
+            target_reps=f"{data['reps_min']}-{data['reps_max']}",
+            status="in_progress",
+        )
+        session.add(cw)
+    logger.info(f"Seeded {len(INITIAL_EXERCISES)} exercises with current weights")

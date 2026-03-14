@@ -5,6 +5,7 @@ import HistoryPage from './pages/HistoryPage';
 import WorkoutsPage from './pages/WorkoutsPage';
 import AdvisorPage from './pages/AdvisorPage';
 import AddTransactionPage from './pages/AddTransactionPage';
+import WorkoutSessionPage from './pages/WorkoutSessionPage';
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/workouts" element={<WorkoutsPage />} />
         <Route path="/advisor" element={<AdvisorPage />} />
         <Route path="/add" element={<AddTransactionPage />} />
+        <Route path="/workout/session" element={<WorkoutSessionPage />} />
       </Routes>
       <BottomNav />
     </div>
