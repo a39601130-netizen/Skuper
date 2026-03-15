@@ -176,12 +176,18 @@ Telegram Mini App присылает `X-Telegram-Init-Data` заголовок.
 | /weights | current_weights_command | workout/progress.py |
 | /progress | progress_command | workout/progress.py |
 
-## Деплой
+## Деплой (Docker Compose)
 - Сервер: VPS (193.106.251.72), `ssh bot`, `~/Artur/Skuper`
-- Skill: `/update-budget-bot` — коммит + push + перезапуск
-- Skill: `/restart-budget-bot` — только перезапуск
-- Skill: `/budget-bot-logs` — просмотр логов
-- Ручной деплой: `git pull && docker compose up --build -d`
+- Контейнеры: budget_postgres (PG 16) + budget_bot (Python 3.11 + frontend dist) + budget_caddy (отдельный compose)
+- Деплой: `ssh bot "cd ~/Artur/Skuper && git pull && docker compose up --build -d"`
+- Проверка: `ssh bot "cd ~/Artur/Skuper && docker compose ps"` — budget_bot должен быть Up (healthy)
+- Логи: `ssh bot "cd ~/Artur/Skuper && docker compose logs --tail=50 budget_bot"`
+
+### Skills:
+- `/update-budget-bot` — коммит + push + docker rebuild на сервере
+- `/restart-budget-bot` — только restart контейнера (без rebuild)
+- `/budget-bot-logs` — просмотр логов и статуса
+- `/start-local` — запуск локально для тестирования
 
 ## Локальная разработка
 ```bash

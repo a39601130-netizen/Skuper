@@ -27,11 +27,30 @@ export default function AddTransactionPage() {
   const [step, setStep] = useState<Step>('type');
   const [data, setData] = useState<Partial<TransactionCreate>>({ currency: 'BYN' });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [customDay, setCustomDay] = useState('');
 
   useEffect(() => {
-    getReferences().then(setRefs).catch(() => {});
+    getReferences().then(setRefs).catch((e) => setError(e.message || 'Не удалось загрузить данные'));
   }, []);
+
+  const stepOrder: Step[] = ['type', 'date', 'account', 'to_account', 'category', 'currency', 'amount', 'exchange_rate', 'hours', 'comment', 'confirm'];
+  const goBack = () => {
+    const idx = stepOrder.indexOf(step);
+    if (idx <= 0) { navigate('/'); return; }
+    // Find previous valid step
+    for (let i = idx - 1; i >= 0; i--) {
+      const prev = stepOrder[i];
+      if (prev === 'to_account' && data.type !== 'Перевод' && data.type !== 'Обмен валюты') continue;
+      if (prev === 'category' && (data.type === 'Перевод')) continue;
+      if (prev === 'currency' && data.type !== 'Обмен валюты') continue;
+      if (prev === 'exchange_rate' && data.type !== 'Обмен валюты') continue;
+      if (prev === 'hours' && !(data.type === 'Доход' && (data.category === 'Зарплата' || data.category === 'Чаевые'))) continue;
+      setStep(prev);
+      return;
+    }
+    navigate('/');
+  };
 
   const haptic = () => window.Telegram?.WebApp?.HapticFeedback?.selectionChanged();
 
@@ -127,12 +146,14 @@ export default function AddTransactionPage() {
   const handleSubmit = async () => {
     if (!data.type || !data.account || !data.amount) return;
     setLoading(true);
+    setError('');
     try {
       await createTransaction(data as TransactionCreate);
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       navigate('/');
-    } catch {
+    } catch (e) {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
       setLoading(false);
     }
@@ -151,9 +172,32 @@ export default function AddTransactionPage() {
     ? (data.amount * data.exchange_rate).toFixed(2)
     : null;
 
+  if (error && !refs) return (
+    <div className="page">
+      <div className="error-box">
+        <div className="error-icon">⚠️</div>
+        <div className="error-text">{error}</div>
+        <button className="btn btn-primary" onClick={() => window.location.reload()}>Повторить</button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="page">
-      <h1 className="page-title">Новая транзакция</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        {step !== 'type' && (
+          <button className="btn btn-ghost" onClick={goBack} style={{ padding: '4px 12px', fontSize: 14 }}>
+            ← Назад
+          </button>
+        )}
+        <h1 className="page-title" style={{ margin: 0 }}>Новая транзакция</h1>
+      </div>
+
+      {error && (
+        <div className="card" style={{ borderLeft: '3px solid var(--danger)', marginBottom: 12 }}>
+          <div style={{ color: 'var(--danger)', fontSize: 14 }}>⚠️ {error}</div>
+        </div>
+      )}
 
       {/* Step: Type */}
       {step === 'type' && (

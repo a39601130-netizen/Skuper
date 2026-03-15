@@ -12,12 +12,13 @@ const TYPE_EMOJI: Record<string, string> = {
 export default function HistoryPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = () => {
-    setLoading(true);
+    setLoading(true); setError('');
     getTransactions(50)
       .then(setTransactions)
-      .catch(() => {})
+      .catch((e) => setError(e.message || 'Ошибка загрузки'))
       .finally(() => setLoading(false));
   };
 
@@ -35,6 +36,15 @@ export default function HistoryPage() {
   };
 
   if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  if (error) return (
+    <div className="page">
+      <div className="error-box">
+        <div className="error-icon">⚠️</div>
+        <div className="error-text">{error}</div>
+        <button className="btn btn-primary" onClick={load}>Повторить</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="page">

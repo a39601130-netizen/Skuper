@@ -1,19 +1,37 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getIncomeStats } from '../api/client';
 import type { IncomeStats } from '../types';
 
 export default function IncomeStatsPage() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<IncomeStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true); setError('');
     getIncomeStats()
       .then(setStats)
-      .catch(() => {})
+      .catch((e) => setError(e.message || 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(load, []);
 
   if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  if (error) return (
+    <div className="page">
+      <div className="error-box">
+        <div className="error-icon">⚠️</div>
+        <div className="error-text">{error}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => navigate(-1)}>← Назад</button>
+          <button className="btn btn-primary" onClick={load}>Повторить</button>
+        </div>
+      </div>
+    </div>
+  );
   if (!stats) return <div className="page"><div className="empty"><div className="empty-icon">📊</div>Нет данных</div></div>;
 
   const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -22,7 +40,10 @@ export default function IncomeStatsPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Доходы — {monthNames[stats.month]} {stats.year}</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px', fontSize: 14 }}>← Назад</button>
+        <h1 className="page-title" style={{ margin: 0 }}>Доходы — {monthNames[stats.month]} {stats.year}</h1>
+      </div>
 
       {/* Summary */}
       <div className="grid-2">

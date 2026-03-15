@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getWeeklySummary } from '../api/client';
 import type { WeeklySummary } from '../types';
 
@@ -11,21 +12,35 @@ const CATEGORY_EMOJI: Record<string, string> = {
 };
 
 export default function WeeklyReportPage() {
+  const navigate = useNavigate();
   const [report, setReport] = useState<WeeklySummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [daysBack, setDaysBack] = useState(7);
 
   const load = (days: number) => {
-    setLoading(true);
+    setLoading(true); setError('');
     getWeeklySummary(days)
       .then(setReport)
-      .catch(() => {})
+      .catch((e) => setError(e.message || 'Ошибка загрузки'))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(daysBack); }, [daysBack]);
 
   if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  if (error) return (
+    <div className="page">
+      <div className="error-box">
+        <div className="error-icon">⚠️</div>
+        <div className="error-text">{error}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => navigate(-1)}>← Назад</button>
+          <button className="btn btn-primary" onClick={() => load(daysBack)}>Повторить</button>
+        </div>
+      </div>
+    </div>
+  );
   if (!report) return <div className="page"><div className="empty"><div className="empty-icon">📊</div>Нет данных</div></div>;
 
   const sortedCategories = Object.entries(report.expense_by_category)
@@ -35,7 +50,10 @@ export default function WeeklyReportPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Отчёт</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px', fontSize: 14 }}>← Назад</button>
+        <h1 className="page-title" style={{ margin: 0 }}>Отчёт</h1>
+      </div>
 
       {/* Period selector */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>

@@ -10,14 +10,28 @@ export default function WorkoutsPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'next' | 'weights'>('next');
 
-  useEffect(() => {
+  const [error, setError] = useState('');
+
+  const load = () => {
+    setLoading(true); setError('');
     Promise.all([getCurrentWeights(), getNextWorkout()])
       .then(([w, n]) => { setWeights(w); setNext(n); })
-      .catch(() => {})
+      .catch((e) => setError(e.message || 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(load, []);
 
   if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  if (error) return (
+    <div className="page">
+      <div className="error-box">
+        <div className="error-icon">⚠️</div>
+        <div className="error-text">{error}</div>
+        <button className="btn btn-primary" onClick={load}>Повторить</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="page">
@@ -48,6 +62,9 @@ export default function WorkoutsPage() {
       </div>
 
       {/* Next Workout */}
+      {tab === 'next' && !next && (
+        <div className="empty"><div className="empty-icon">🏋️</div>Нет данных о следующей тренировке</div>
+      )}
       {tab === 'next' && next && (
         <>
           <div className="card">
@@ -82,7 +99,10 @@ export default function WorkoutsPage() {
       )}
 
       {/* Current Weights */}
-      {tab === 'weights' && (
+      {tab === 'weights' && weights.length === 0 && (
+        <div className="empty"><div className="empty-icon">📊</div>Нет данных о весах</div>
+      )}
+      {tab === 'weights' && weights.length > 0 && (
         <>
           {['A', 'B'].map((day) => {
             const dayWeights = weights.filter((w) => w.day === day);

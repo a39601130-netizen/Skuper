@@ -1,29 +1,17 @@
 name: migrate-to-pg
-description: Миграция данных из Google Sheets в PostgreSQL (одноразово)
+description: Одноразовая миграция Google Sheets -> PostgreSQL
 instructions: |
-  Запускает одноразовую миграцию данных из Google Sheets в PostgreSQL.
-
-  ВНИМАНИЕ: Выполнять только один раз при первом деплое!
-
-  Шаги:
+  Миграция данных из Google Sheets в PostgreSQL. Выполнять ОДИН раз!
 
   1. ПРОВЕРИТЬ ГОТОВНОСТЬ:
-     - Убедиться что budget_postgres контейнер запущен:
-       `ssh bot "docker compose -f ~/Artur/Skuper/docker-compose.yml ps budget_postgres"`
-     - Убедиться что google_credentials.json на месте на сервере
+     - `ssh bot "cd ~/Artur/Skuper && docker compose ps budget_postgres"`
+     - Должен быть healthy
 
-  2. ЗАПУСТИТЬ МИГРАЦИЮ:
+  2. ЗАПУСТИТЬ:
      - `ssh bot "cd ~/Artur/Skuper && docker compose exec budget_bot python scripts/migrate_sheets_to_pg.py"`
 
-  3. ПРОВЕРИТЬ РЕЗУЛЬТАТ:
-     - Смотри вывод скрипта — должны быть строки "Мигрировано X транзакций", "Мигрировано X тренировок"
-     - Если ошибки — сообщи пользователю
+  3. ПРОВЕРИТЬ:
+     - В выводе: "Мигрировано X транзакций", "Мигрировано X тренировок"
+     - `curl https://budget-bot.duckdns.org/api/health`
 
-  4. ВЕРИФИКАЦИЯ:
-     - Проверь через API: `curl https://budget-bot.duckdns.org/api/health`
-     - Или локально: `ssh bot "docker compose exec budget_bot python -c \"import asyncio; from db.database import init_db; asyncio.run(init_db())\""`
-
-  ВАЖНО:
-  - Скрипт не дублирует данные (проверяет дату и сумму)
-  - После миграции Google Sheets остаётся как backup
-  - Новые записи через Mini App идут только в PostgreSQL
+  ВАЖНО: Скрипт идемпотентный (проверяет дубли по дате+сумме)

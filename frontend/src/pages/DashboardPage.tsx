@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { getMonthlySummary } from '../api/client';
 import type { MonthlySummary } from '../types';
 
@@ -12,13 +12,17 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true); setError('');
     getMonthlySummary()
       .then(setSummary)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(load, [location.key, load]);
 
   if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
   if (error) return (

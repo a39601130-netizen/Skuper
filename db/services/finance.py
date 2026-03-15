@@ -108,17 +108,35 @@ async def add_transaction(
     return tx
 
 
-async def get_recent_transactions(db: AsyncSession, limit: int = 20) -> List[Dict[str, Any]]:
-    result = await db.execute(
+async def get_recent_transactions(
+    db: AsyncSession,
+    limit: int = 20,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    category: Optional[str] = None,
+    trans_type: Optional[str] = None,
+    account_name: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    query = (
         select(Transaction)
         .options(
             selectinload(Transaction.account),
             selectinload(Transaction.category),
             selectinload(Transaction.to_account),
         )
-        .order_by(Transaction.date.desc(), Transaction.id.desc())
-        .limit(limit)
     )
+    if date_from:
+        query = query.where(Transaction.date >= date_from)
+    if date_to:
+        query = query.where(Transaction.date <= date_to)
+    if trans_type:
+        query = query.where(Transaction.type == trans_type)
+    if category:
+        query = query.join(Transaction.category).where(Category.name == category)
+    if account_name:
+        query = query.join(Transaction.account).where(Account.name == account_name)
+    query = query.order_by(Transaction.date.desc(), Transaction.id.desc()).limit(limit)
+    result = await db.execute(query)
     txs = result.scalars().all()
     return [_tx_to_dict(tx) for tx in txs]
 

@@ -1,27 +1,19 @@
 name: start-local
-description: Запустить budget_bot локально для тестирования
+description: Запуск budget_bot локально для тестирования
 instructions: |
-  Запускает budget_bot локально для тестирования изменений.
+  Запускает budget_bot локально. ТОЛЬКО по явной команде пользователя.
 
-  ВАЖНО: Этот skill запускается ТОЛЬКО по явной команде пользователя.
+  1. ПРОВЕРИТЬ ЗАПУЩЕННЫЕ ПРОЦЕССЫ:
+     - `tasklist 2>/dev/null | grep python || ps aux 2>/dev/null | grep "python run.py" | grep -v grep`
+     - Если бот уже запущен — спросить, перезапустить ли
 
-  Шаги:
+  2. ЗАПУСТИТЬ В ФОНЕ (run_in_background=true):
+     - `cd /f/budget_bot && ./venv/Scripts/python.exe run.py`
 
-  1. ПРОВЕРИТЬ — НЕТ ЛИ ЗАПУЩЕННОГО БОТА:
-     `ps aux 2>/dev/null | grep "python main.py" | grep -v grep || tasklist 2>/dev/null | grep python`
-     Если бот уже запущен — сообщи пользователю и спроси, перезапустить ли.
-
-  2. ЗАПУСТИТЬ БОТА В ФОНЕ:
-     Bash с run_in_background=true: `cd /f/budget_bot && ./venv/Scripts/python.exe main.py`
-
-  3. ПОДОЖДАТЬ И ПРОВЕРИТЬ:
-     `sleep 4`
-     Проверь логи фонового процесса — должно быть "Budget Bot запущен!" и "Application started".
-
-  4. ПОКАЗАТЬ РЕЗУЛЬТАТ:
-     - Сообщить что бот запущен локально
-     - Напомнить: для остановки используй /stop-local или Ctrl+C в терминале
+  3. ПРОВЕРИТЬ (через 5 сек):
+     - Логи фонового процесса должны содержать "Bot polling started" и "FastAPI server starting"
 
   ВАЖНО:
+  - Entry point: `run.py` (НЕ main.py)
   - .env и google_credentials.json должны быть на месте
-  - Если ошибка импорта — проверь requirements: ./venv/Scripts/pip install -r requirements.txt
+  - При ошибках импорта: `./venv/Scripts/pip install -r requirements.txt`
