@@ -171,6 +171,26 @@ async def get_category_spending(db: AsyncSession) -> Dict[str, float]:
     return spending
 
 
+async def get_daily_spending(db: AsyncSession) -> List[Dict[str, Any]]:
+    """Расходы по дням за текущий месяц. Возвращает [{date, amount}]."""
+    today = date.today()
+    result = await db.execute(
+        select(Transaction)
+        .where(
+            Transaction.type == "Расход",
+            extract("month", Transaction.date) == today.month,
+            extract("year", Transaction.date) == today.year,
+        )
+    )
+    txs = result.scalars().all()
+    by_day: Dict[str, float] = {}
+    for tx in txs:
+        day_str = tx.date.strftime("%Y-%m-%d") if tx.date else str(today)
+        amount = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
+        by_day[day_str] = by_day.get(day_str, 0.0) + amount
+    return [{"date": d, "amount": round(a, 2)} for d, a in sorted(by_day.items())]
+
+
 async def get_monthly_summary(db: AsyncSession) -> Dict[str, Any]:
     """Месячная сводка: доходы, расходы, балансы, категории."""
     today = date.today()
