@@ -150,6 +150,27 @@ async def delete_transaction(db: AsyncSession, tx_id: int) -> bool:
     return True
 
 
+async def get_category_spending(db: AsyncSession) -> Dict[str, float]:
+    """Расходы по категориям за текущий месяц. Возвращает {category_name: amount}."""
+    today = date.today()
+    result = await db.execute(
+        select(Transaction)
+        .options(selectinload(Transaction.category))
+        .where(
+            Transaction.type == "Расход",
+            extract("month", Transaction.date) == today.month,
+            extract("year", Transaction.date) == today.year,
+        )
+    )
+    txs = result.scalars().all()
+    spending: Dict[str, float] = {}
+    for tx in txs:
+        cat_name = tx.category.name if tx.category else "Другое"
+        amount = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
+        spending[cat_name] = spending.get(cat_name, 0.0) + amount
+    return spending
+
+
 async def get_monthly_summary(db: AsyncSession) -> Dict[str, Any]:
     """Месячная сводка: доходы, расходы, балансы, категории."""
     today = date.today()
