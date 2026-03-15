@@ -1,23 +1,41 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getIncomeStats } from '../api/client';
 import type { IncomeStats } from '../types';
 
+const MONTH_NAMES = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
 export default function IncomeStatsPage() {
   const navigate = useNavigate();
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
   const [stats, setStats] = useState<IncomeStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = () => {
+  const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear();
+
+  const prevMonth = () => {
+    if (month === 1) { setMonth(12); setYear(y => y - 1); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (isCurrentMonth) return;
+    if (month === 12) { setMonth(1); setYear(y => y + 1); }
+    else setMonth(m => m + 1);
+  };
+
+  const load = useCallback(() => {
     setLoading(true); setError('');
-    getIncomeStats()
+    getIncomeStats(month, year)
       .then(setStats)
       .catch((e) => setError(e.message || 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  };
+  }, [month, year]);
 
-  useEffect(load, []);
+  useEffect(load, [load]);
 
   if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
   if (error) return (
@@ -34,15 +52,34 @@ export default function IncomeStatsPage() {
   );
   if (!stats) return <div className="page"><div className="empty"><div className="empty-icon">📊</div>Нет данных</div></div>;
 
-  const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
   const avgPerHour = stats.total_hours > 0 ? (stats.total_income / stats.total_hours).toFixed(2) : '—';
 
   return (
     <div className="page">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px', fontSize: 14 }}>← Назад</button>
-        <h1 className="page-title" style={{ margin: 0 }}>Доходы — {monthNames[stats.month]} {stats.year}</h1>
+        <h1 className="page-title" style={{ margin: 0 }}>Доходы</h1>
+      </div>
+
+      {/* Month selector */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 12, marginBottom: 12,
+      }}>
+        <button className="btn btn-ghost" onClick={prevMonth} style={{ padding: '4px 12px' }}>
+          ←
+        </button>
+        <span style={{ fontWeight: 600, fontSize: 15, minWidth: 130, textAlign: 'center' }}>
+          {MONTH_NAMES[month]} {year}
+        </span>
+        <button
+          className="btn btn-ghost"
+          onClick={nextMonth}
+          disabled={isCurrentMonth}
+          style={{ padding: '4px 12px', opacity: isCurrentMonth ? 0.3 : 1 }}
+        >
+          →
+        </button>
       </div>
 
       {/* Summary */}

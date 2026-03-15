@@ -60,8 +60,21 @@ export const getCategories = () => request<Category[]>('/categories');
 export const getReferences = () => request<References>('/categories/references');
 
 // --- Stats ---
-export const getMonthlySummary = () => request<MonthlySummary>('/stats/monthly');
-export const getIncomeStats = () => request<IncomeStats>('/stats/income');
+export const getMonthlySummary = (month?: number, year?: number) => {
+  const params = new URLSearchParams();
+  if (month) params.set('month', String(month));
+  if (year) params.set('year', String(year));
+  const qs = params.toString();
+  return request<MonthlySummary>(`/stats/monthly${qs ? `?${qs}` : ''}`);
+};
+
+export const getIncomeStats = (month?: number, year?: number) => {
+  const params = new URLSearchParams();
+  if (month) params.set('month', String(month));
+  if (year) params.set('year', String(year));
+  const qs = params.toString();
+  return request<IncomeStats>(`/stats/income${qs ? `?${qs}` : ''}`);
+};
 export const getWeeklySummary = (daysBack = 7) =>
   request<WeeklySummary>(`/stats/weekly?days_back=${daysBack}`);
 

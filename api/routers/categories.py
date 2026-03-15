@@ -1,6 +1,6 @@
 """API роутер: категории и справочники (PostgreSQL)."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
@@ -12,11 +12,13 @@ router = APIRouter(prefix="/api/categories", tags=["categories"])
 
 @router.get("")
 async def list_categories(
+    month: int = Query(default=None, ge=1, le=12),
+    year: int = Query(default=None, ge=2020, le=2100),
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     cats = await get_categories(db)
-    spending = await get_category_spending(db)
+    spending = await get_category_spending(db, month=month, year=year)
     return [
         {
             "name": c.name,

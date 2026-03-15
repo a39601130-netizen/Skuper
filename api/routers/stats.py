@@ -12,18 +12,22 @@ router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 @router.get("/monthly")
 async def monthly_summary(
+    month: int = Query(default=None, ge=1, le=12),
+    year: int = Query(default=None, ge=2020, le=2100),
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_monthly_summary(db)
+    return await get_monthly_summary(db, month=month, year=year)
 
 
 @router.get("/income")
 async def income_stats(
+    month: int = Query(default=None, ge=1, le=12),
+    year: int = Query(default=None, ge=2020, le=2100),
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_income_by_days(db)
+    return await get_income_by_days(db, month=month, year=year)
 
 
 @router.get("/weekly")
@@ -37,7 +41,9 @@ async def weekly_summary(
 
 @router.get("/daily-spending")
 async def daily_spending(
+    month: int = Query(default=None, ge=1, le=12),
+    year: int = Query(default=None, ge=2020, le=2100),
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_daily_spending(db)
+    return await get_daily_spending(db, month=month, year=year)

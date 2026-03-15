@@ -3,24 +3,42 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getMonthlySummary } from '../api/client';
 import type { MonthlySummary } from '../types';
 
+const MONTH_NAMES = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
 function formatMoney(value: number, currency = 'BYN'): string {
   return `${value.toFixed(2)} ${currency}`;
 }
 
 export default function DashboardPage() {
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
 
+  const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear();
+
+  const prevMonth = () => {
+    if (month === 1) { setMonth(12); setYear(y => y - 1); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (isCurrentMonth) return;
+    if (month === 12) { setMonth(1); setYear(y => y + 1); }
+    else setMonth(m => m + 1);
+  };
+
   const load = useCallback(() => {
     setLoading(true); setError('');
-    getMonthlySummary()
+    getMonthlySummary(month, year)
       .then(setSummary)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [month, year]);
 
   useEffect(load, [location.key, load]);
 
@@ -52,6 +70,27 @@ export default function DashboardPage() {
   return (
     <div className="page">
       <h1 className="page-title">Финансы</h1>
+
+      {/* Month selector */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 12, marginBottom: 12,
+      }}>
+        <button className="btn btn-ghost" onClick={prevMonth} style={{ padding: '4px 12px' }}>
+          ←
+        </button>
+        <span style={{ fontWeight: 600, fontSize: 15, minWidth: 130, textAlign: 'center' }}>
+          {MONTH_NAMES[month]} {year}
+        </span>
+        <button
+          className="btn btn-ghost"
+          onClick={nextMonth}
+          disabled={isCurrentMonth}
+          style={{ padding: '4px 12px', opacity: isCurrentMonth ? 0.3 : 1 }}
+        >
+          →
+        </button>
+      </div>
 
       {/* Summary */}
       <div className="grid-2">

@@ -168,16 +168,22 @@ async def delete_transaction(db: AsyncSession, tx_id: int) -> bool:
     return True
 
 
-async def get_category_spending(db: AsyncSession) -> Dict[str, float]:
-    """Расходы по категориям за текущий месяц. Возвращает {category_name: amount}."""
+async def get_category_spending(
+    db: AsyncSession,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+) -> Dict[str, float]:
+    """Расходы по категориям за месяц. Возвращает {category_name: amount}."""
     today = date.today()
+    m = month or today.month
+    y = year or today.year
     result = await db.execute(
         select(Transaction)
         .options(selectinload(Transaction.category))
         .where(
             Transaction.type == "Расход",
-            extract("month", Transaction.date) == today.month,
-            extract("year", Transaction.date) == today.year,
+            extract("month", Transaction.date) == m,
+            extract("year", Transaction.date) == y,
         )
     )
     txs = result.scalars().all()
@@ -189,15 +195,21 @@ async def get_category_spending(db: AsyncSession) -> Dict[str, float]:
     return spending
 
 
-async def get_daily_spending(db: AsyncSession) -> List[Dict[str, Any]]:
-    """Расходы по дням за текущий месяц. Возвращает [{date, amount}]."""
+async def get_daily_spending(
+    db: AsyncSession,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """Расходы по дням за месяц. Возвращает [{date, amount}]."""
     today = date.today()
+    m = month or today.month
+    y = year or today.year
     result = await db.execute(
         select(Transaction)
         .where(
             Transaction.type == "Расход",
-            extract("month", Transaction.date) == today.month,
-            extract("year", Transaction.date) == today.year,
+            extract("month", Transaction.date) == m,
+            extract("year", Transaction.date) == y,
         )
     )
     txs = result.scalars().all()
@@ -209,10 +221,15 @@ async def get_daily_spending(db: AsyncSession) -> List[Dict[str, Any]]:
     return [{"date": d, "amount": round(a, 2)} for d, a in sorted(by_day.items())]
 
 
-async def get_monthly_summary(db: AsyncSession) -> Dict[str, Any]:
+async def get_monthly_summary(
+    db: AsyncSession,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+) -> Dict[str, Any]:
     """Месячная сводка: доходы, расходы, балансы, категории."""
     today = date.today()
-    month, year = today.month, today.year
+    month = month or today.month
+    year = year or today.year
 
     # Все транзакции текущего месяца
     result = await db.execute(
@@ -295,10 +312,15 @@ async def get_monthly_summary(db: AsyncSession) -> Dict[str, Any]:
     }
 
 
-async def get_income_by_days(db: AsyncSession) -> Dict[str, Any]:
+async def get_income_by_days(
+    db: AsyncSession,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+) -> Dict[str, Any]:
     """Доходы по дням с детализацией."""
     today = date.today()
-    month, year = today.month, today.year
+    month = month or today.month
+    year = year or today.year
 
     result = await db.execute(
         select(Transaction)
