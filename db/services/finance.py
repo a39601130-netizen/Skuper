@@ -261,6 +261,13 @@ async def get_monthly_summary(
             cat_name = tx.category.name if tx.category else "Другое"
             expense_by_category[cat_name] = expense_by_category.get(cat_name, 0.0) + byn_amount
 
+    # Расходы по счетам
+    expense_by_account: Dict[int, float] = {}
+    for tx in txs:
+        if tx.type == "Расход":
+            byn = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
+            expense_by_account[tx.account_id] = expense_by_account.get(tx.account_id, 0.0) + byn
+
     # Счета
     accounts = await get_accounts(db)
     accounts_data = [
@@ -270,6 +277,7 @@ async def get_monthly_summary(
             "current": a.balance,
             "initial": a.initial_balance,
             "emoji": a.emoji or config.CATEGORY_EMOJI.get(a.name, "💳"),
+            "monthly_spent": round(expense_by_account.get(a.id, 0.0), 2),
         }
         for a in accounts
     ]

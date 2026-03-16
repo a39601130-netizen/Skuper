@@ -55,6 +55,7 @@ export interface Account {
   current: number;
   initial: number;
   emoji?: string;
+  monthly_spent?: number;
 }
 
 export interface Category {
