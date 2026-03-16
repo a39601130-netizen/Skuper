@@ -79,6 +79,9 @@ export default function DashboardPage() {
             <span className="list-item-icon">{acc.emoji || '💳'}</span>
             <div className="list-item-content">
               <div className="list-item-title">{acc.name}</div>
+              {acc.monthly_spent ? (
+                <div className="stat-label">Расход: {formatMoney(acc.monthly_spent)}</div>
+              ) : null}
             </div>
             <div className="list-item-right">
               <span className="amount">{formatMoney(acc.current, acc.currency)}</span>

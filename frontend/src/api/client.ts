@@ -32,7 +32,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-    throw new Error(error.detail || `HTTP ${response.status}`);
+    const detail = error.detail;
+    const message = typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail)
+        ? detail.map((e: { msg?: string }) => e.msg || '').filter(Boolean).join('; ')
+        : `HTTP ${response.status}`;
+    throw new Error(message || `HTTP ${response.status}`);
   }
 
   if (response.status === 204) return undefined as T;
