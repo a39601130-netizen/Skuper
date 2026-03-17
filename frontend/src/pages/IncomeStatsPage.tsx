@@ -122,11 +122,12 @@ export default function IncomeStatsPage() {
                 {day.other > 0 && <span>📦 {day.other.toFixed(0)}</span>}
                 {day.hours > 0 && <span>🕐 {day.hours}ч</span>}
               </div>
-              {day.transactions.length > 1 && (
+              {(day.transactions.length > 1 || day.transactions.some(t => t.comment)) && (
                 <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
                   {day.transactions.map((t) => (
                     <div key={t.id}>
-                      {t.category}: {t.amount} {t.currency}{t.comment ? ` — ${t.comment}` : ''}
+                      {day.transactions.length > 1 && <>{t.category}: {t.amount} {t.currency}</>}
+                      {t.comment ? (day.transactions.length > 1 ? ` — ${t.comment}` : `💬 ${t.comment}`) : ''}
                     </div>
                   ))}
                 </div>

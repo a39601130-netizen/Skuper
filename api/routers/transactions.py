@@ -3,7 +3,7 @@
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, field_validator
-from typing import Optional
+from typing import Optional, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
@@ -27,6 +27,13 @@ class TransactionCreate(BaseModel):
     exchange_rate: Optional[float] = None
     amount_to: Optional[float] = None
     currency: str = "BYN"
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def parse_date(cls, v):
+        if isinstance(v, str):
+            return date.fromisoformat(v)
+        return v
 
     @field_validator("amount")
     @classmethod
