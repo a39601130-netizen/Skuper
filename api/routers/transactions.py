@@ -1,5 +1,7 @@
 """API роутер: транзакции (PostgreSQL)."""
 
+import asyncio
+import logging
 from datetime import date
 from typing import Annotated, Optional
 
@@ -10,6 +12,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_current_user
 from db.database import get_db
 from db.services.finance import add_transaction, get_recent_transactions, delete_transaction
+
+logger = logging.getLogger(__name__)
+
+
+def _sync_tx_to_sheets(tx):
+    """Background helper: sync transaction to Sheets."""
+    try:
+        from services.sync import sync_transaction_to_sheets
+        sync_transaction_to_sheets(tx)
+    except Exception as e:
+        logger.error(f"Background sheets sync failed: {e}")
+
+
+def _delete_tx_from_sheets(tx_id: int):
+    """Background helper: delete transaction from Sheets."""
+    try:
+        from services.sync import delete_transaction_from_sheets
+        delete_transaction_from_sheets(tx_id)
+    except Exception as e:
+        logger.error(f"Background sheets delete failed: {e}")
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
@@ -102,6 +124,10 @@ async def create_transaction(
             amount_to=data.amount_to,
             currency=data.currency,
         )
+        # Background sync to Google Sheets
+        asyncio.get_event_loop().run_in_executor(
+            None, _sync_tx_to_sheets, tx
+        )
         return {"status": "ok", "id": tx.id}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -116,4 +142,8 @@ async def remove_transaction(
     success = await delete_transaction(db, tx_id)
     if not success:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    # Background delete from Google Sheets
+    asyncio.get_event_loop().run_in_executor(
+        None, _delete_tx_from_sheets, tx_id
+    )
     return {"status": "ok"}

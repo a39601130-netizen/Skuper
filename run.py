@@ -35,10 +35,12 @@ async def main():
     logger.info("PostgreSQL инициализирован")
 
     # Инициализируем Google Sheets (опционально)
+    sheets_ok = False
     try:
         from services.sheets import get_sheets_service
         sheets = get_sheets_service()
         sheets.ensure_exchange_type_exists()
+        sheets_ok = True
     except Exception as e:
         logger.warning(f"Google Sheets init: {e}")
 
@@ -65,10 +67,22 @@ async def main():
     logger.info("🤖 Bot polling started")
     logger.info("🌐 FastAPI server starting on :8000")
 
+    # Запускаем периодическую синхронизацию Sheets ↔ PG
+    sync_task = None
+    if sheets_ok:
+        try:
+            from services.sync import periodic_sync_task
+            sync_task = asyncio.create_task(periodic_sync_task(interval_minutes=5))
+            logger.info("🔄 Sheets sync task started (every 5 min)")
+        except Exception as e:
+            logger.warning(f"Sheets sync task failed to start: {e}")
+
     try:
         await server.serve()
     finally:
         logger.info("Shutting down...")
+        if sync_task:
+            sync_task.cancel()
         await bot_app.updater.stop()
         await bot_app.stop()
         await bot_app.shutdown()

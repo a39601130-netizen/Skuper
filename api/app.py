@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
 
-from api.routers import health, transactions, accounts, categories, stats, workouts, exercises, advisor, recurring
+from api.routers import health, transactions, accounts, categories, stats, workouts, exercises, advisor, recurring, sync
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(exercises.router)
     app.include_router(advisor.router)
     app.include_router(recurring.router)
+    app.include_router(sync.router)
 
     # SPA fallback — раздаём собранный React
     if os.path.isdir(FRONTEND_DIR):

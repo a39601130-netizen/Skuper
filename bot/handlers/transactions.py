@@ -22,6 +22,39 @@ from services.sheets import get_sheets_service
 from utils.formatters import format_transaction_success, parse_quick_input
 import config
 
+# Helper: save transaction to PG (async)
+async def _save_to_pg(
+    trans_type, account, amount, category=None, to_account=None,
+    comment=None, hours=None, exchange_rate=None, amount_to=None,
+    currency="BYN", day=None,
+):
+    """Save a bot transaction to PostgreSQL in background."""
+    try:
+        from datetime import date
+        from db.database import async_session
+        from db.services.finance import add_transaction
+        tx_date = date.today()
+        if day:
+            tx_date = tx_date.replace(day=int(day))
+        async with async_session() as db:
+            await add_transaction(
+                db,
+                trans_date=tx_date,
+                trans_type=trans_type,
+                account_name=account,
+                amount=amount,
+                category_name=category,
+                to_account_name=to_account,
+                comment=comment,
+                hours=hours,
+                exchange_rate=exchange_rate,
+                amount_to=amount_to,
+                currency=currency,
+            )
+        logger.info(f"Bot tx saved to PG: {trans_type} {amount} {currency}")
+    except Exception as e:
+        logger.error(f"Failed to save bot tx to PG: {e}")
+
 logger = logging.getLogger(__name__)
 
 # Хранилище данных транзакций по user_id
@@ -118,8 +151,18 @@ async def handle_quick_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             comment=parsed.get("comment"),
             hours=parsed.get("hours")
         )
-        
+
         if success:
+            # Also save to PostgreSQL
+            await _save_to_pg(
+                trans_type=parsed["type"],
+                account="Наличные",
+                amount=parsed["amount"],
+                category=parsed["category"],
+                comment=parsed.get("comment"),
+                hours=parsed.get("hours"),
+                day=day,
+            )
             response = format_transaction_success(
                 trans_type=parsed["type"],
                 amount=parsed["amount"],
@@ -1008,6 +1051,20 @@ async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             if success:
+                # Also save to PostgreSQL
+                await _save_to_pg(
+                    trans_type=trans.trans_type,
+                    account=account,
+                    amount=trans.amount,
+                    category=trans.category,
+                    to_account=trans.to_account,
+                    comment=trans.comment,
+                    hours=trans.hours,
+                    exchange_rate=trans.exchange_rate,
+                    amount_to=trans.amount_to,
+                    currency=trans.currency,
+                    day=day,
+                )
                 response = format_transaction_success(
                     trans_type=trans.trans_type,
                     amount=trans.amount,
