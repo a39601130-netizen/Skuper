@@ -16,11 +16,11 @@ from db.services.finance import add_transaction, get_recent_transactions, delete
 logger = logging.getLogger(__name__)
 
 
-def _sync_tx_to_sheets(tx):
+def _sync_tx_to_sheets(tx_data: dict):
     """Background helper: sync transaction to Sheets."""
     try:
         from services.sync import sync_transaction_to_sheets
-        sync_transaction_to_sheets(tx)
+        sync_transaction_to_sheets(**tx_data)
     except Exception as e:
         logger.error(f"Background sheets sync failed: {e}")
 
@@ -124,9 +124,23 @@ async def create_transaction(
             amount_to=data.amount_to,
             currency=data.currency,
         )
-        # Background sync to Google Sheets
+        # Background sync to Google Sheets (collect data while in session)
+        tx_data = {
+            "tx_id": tx.id,
+            "tx_date": tx.date,
+            "tx_type": tx.type,
+            "account_name": data.account,
+            "category_name": data.category or "",
+            "amount": tx.amount,
+            "to_account_name": data.to_account or "",
+            "comment": tx.comment or "",
+            "hours": tx.hours,
+            "exchange_rate": tx.exchange_rate,
+            "amount_to": tx.amount_to,
+            "currency": tx.currency or "BYN",
+        }
         asyncio.get_event_loop().run_in_executor(
-            None, _sync_tx_to_sheets, tx
+            None, _sync_tx_to_sheets, tx_data
         )
         return {"status": "ok", "id": tx.id}
     except ValueError as e:

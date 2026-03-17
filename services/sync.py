@@ -30,12 +30,50 @@ def _get_sheets():
 # PG → Sheets (after Mini App creates/deletes)
 # ============================================
 
-def sync_transaction_to_sheets(tx: Transaction) -> bool:
+def sync_transaction_to_sheets(
+    tx=None,
+    *,
+    tx_id: int = None,
+    tx_date: date = None,
+    tx_type: str = "",
+    account_name: str = "",
+    category_name: str = "",
+    amount: float = 0,
+    to_account_name: str = "",
+    comment: str = "",
+    hours: float = None,
+    exchange_rate: float = None,
+    amount_to: float = None,
+    currency: str = "BYN",
+) -> bool:
     """
-    Write a PG transaction to Google Sheets.
-    Called after creating a transaction via API.
-    Returns True on success.
+    Write a transaction to Google Sheets.
+    Accepts either ORM Transaction object OR explicit kwargs.
     """
+    # Extract data from ORM object if provided
+    if tx is not None:
+        tx_id = tx.id
+        tx_date = tx.date
+        tx_type = tx.type
+        amount = tx.amount
+        comment = tx.comment or ""
+        hours = tx.hours
+        exchange_rate = tx.exchange_rate
+        amount_to = tx.amount_to
+        currency = tx.currency or "BYN"
+        try:
+            account_name = tx.account.name if tx.account else ""
+        except Exception:
+            account_name = ""
+        try:
+            category_name = tx.category.name if tx.category else ""
+        except Exception:
+            category_name = ""
+        try:
+            to_account_name = tx.to_account.name if tx.to_account else ""
+        except Exception:
+            to_account_name = ""
+
     sheets = _get_sheets()
     if not sheets:
         return False
@@ -50,42 +88,30 @@ def sync_transaction_to_sheets(tx: Transaction) -> bool:
         sheet_year = settings["year"]
 
         # Only sync if transaction is for the current sheet month
-        if tx.date.month != sheet_month or tx.date.year != sheet_year:
+        if tx_date.month != sheet_month or tx_date.year != sheet_year:
             logger.info(
-                f"Skip sync: tx date {tx.date} != sheet period {sheet_month}/{sheet_year}"
+                f"Skip sync: tx date {tx_date} != sheet period {sheet_month}/{sheet_year}"
             )
             return False
-
-        cat_name = ""
-        if tx.category:
-            cat_name = tx.category.name if hasattr(tx.category, "name") else str(tx.category)
-
-        acc_name = ""
-        if tx.account:
-            acc_name = tx.account.name if hasattr(tx.account, "name") else str(tx.account)
-
-        to_acc_name = ""
-        if tx.to_account:
-            to_acc_name = tx.to_account.name if hasattr(tx.to_account, "name") else str(tx.to_account)
 
         # Row: A=day, B=type, C=account, D=category, E=amount,
         #      F=to_account, G=comment, H=formula, I=hours, J=formula,
         #      K=rate, L=amount_to, M=currency, N=pg_id
         row_data = [
-            tx.date.day,
-            tx.type,
-            acc_name,
-            cat_name,
-            tx.amount,
-            to_acc_name,
-            tx.comment or "",
+            tx_date.day,
+            tx_type,
+            account_name,
+            category_name,
+            amount,
+            to_account_name,
+            comment,
             "",  # H: will be overwritten by formula
-            tx.hours if tx.hours else "",
+            hours if hours else "",
             "",  # J: formula
-            tx.exchange_rate if tx.exchange_rate else "",
-            tx.amount_to if tx.amount_to else "",
-            tx.currency or "BYN",
-            tx.id,  # N: PG transaction ID
+            exchange_rate if exchange_rate else "",
+            amount_to if amount_to else "",
+            currency,
+            tx_id,  # N: PG transaction ID
         ]
 
         sheet.append_row(row_data, value_input_option="USER_ENTERED")
@@ -97,11 +123,11 @@ def sync_transaction_to_sheets(tx: Transaction) -> bool:
         sheet.update(f"H{last_row}", [[h_formula]], value_input_option="USER_ENTERED")
         sheet.update(f"J{last_row}", [[j_formula]], value_input_option="USER_ENTERED")
 
-        logger.info(f"Synced tx #{tx.id} to Sheets row {last_row}")
+        logger.info(f"Synced tx #{tx_id} to Sheets row {last_row}")
         return True
 
     except Exception as e:
-        logger.error(f"Failed to sync tx #{tx.id} to Sheets: {e}")
+        logger.error(f"Failed to sync tx #{tx_id} to Sheets: {e}")
         return False
 
 
@@ -368,6 +394,7 @@ async def full_sync() -> dict:
                 .options(
                     selectinload(Transaction.account),
                     selectinload(Transaction.category),
+                    selectinload(Transaction.to_account),
                 )
             )
             pg_txs = list(pg_result.scalars().all())
@@ -375,7 +402,21 @@ async def full_sync() -> dict:
         # Find PG transactions not in Sheets
         for tx in pg_txs:
             if tx.id not in sheets_pg_ids:
-                if sync_transaction_to_sheets(tx):
+                success = sync_transaction_to_sheets(
+                    tx_id=tx.id,
+                    tx_date=tx.date,
+                    tx_type=tx.type,
+                    account_name=tx.account.name if tx.account else "",
+                    category_name=tx.category.name if tx.category else "",
+                    amount=tx.amount,
+                    to_account_name=tx.to_account.name if tx.to_account else "",
+                    comment=tx.comment or "",
+                    hours=tx.hours,
+                    exchange_rate=tx.exchange_rate,
+                    amount_to=tx.amount_to,
+                    currency=tx.currency or "BYN",
+                )
+                if success:
                     result["pg_to_sheets"] += 1
 
         # Step 2: Sheets → PG
