@@ -1,6 +1,7 @@
 """FastAPI application with SPA fallback."""
 
 import os
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -26,8 +27,8 @@ def create_app() -> FastAPI:
             "http://localhost:8000",
         ],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "X-Telegram-Init-Data"],
     )
 
     # API роутеры
@@ -50,6 +51,9 @@ def create_app() -> FastAPI:
         @app.get("/{full_path:path}")
         async def serve_spa(full_path: str):
             file_path = os.path.join(FRONTEND_DIR, full_path)
+            # Защита от path traversal
+            if not Path(file_path).resolve().is_relative_to(Path(FRONTEND_DIR).resolve()):
+                return JSONResponse({"detail": "Forbidden"}, status_code=403)
             if os.path.isfile(file_path):
                 return FileResponse(file_path)
             index = os.path.join(FRONTEND_DIR, "index.html")

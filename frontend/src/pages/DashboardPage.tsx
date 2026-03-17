@@ -6,8 +6,8 @@ import type { MonthlySummary } from '../types';
 const MONTH_NAMES = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 
-function formatMoney(value: number, currency = 'BYN'): string {
-  return `${value.toFixed(2)} ${currency}`;
+function formatMoney(value: number | null | undefined, currency = 'BYN'): string {
+  return `${(value ?? 0).toFixed(2)} ${currency}`;
 }
 
 export default function DashboardPage() {
@@ -33,7 +33,7 @@ export default function DashboardPage() {
   };
 
   const load = useCallback(() => {
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setSummary(null);
     getMonthlySummary(month, year)
       .then(setSummary)
       .catch((e) => setError(e.message))

@@ -4,7 +4,7 @@ from datetime import datetime, date
 from typing import Optional, List
 from sqlalchemy import (
     BigInteger, Boolean, Date, DateTime, Float, ForeignKey,
-    Integer, JSON, String, Text, UniqueConstraint, func
+    Index, Integer, JSON, String, Text, UniqueConstraint, func
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -52,6 +52,10 @@ class Category(Base):
 
 class Transaction(Base):
     __tablename__ = "transactions"
+    __table_args__ = (
+        Index("ix_transaction_date_type", "date", "type"),
+        Index("ix_transaction_account_date", "account_id", "date"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     date: Mapped[date] = mapped_column(Date, index=True)
@@ -134,14 +138,14 @@ class Workout(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     synced_to_sheets: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    sets: Mapped[List["WorkoutSet"]] = relationship(back_populates="workout")
+    sets: Mapped[List["WorkoutSet"]] = relationship(back_populates="workout", cascade="all, delete-orphan")
 
 
 class WorkoutSet(Base):
     __tablename__ = "workout_sets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    workout_id: Mapped[int] = mapped_column(ForeignKey("workouts.id"))
+    workout_id: Mapped[int] = mapped_column(ForeignKey("workouts.id", ondelete="CASCADE"))
     exercise_id: Mapped[str] = mapped_column(
         String(50), ForeignKey("exercises.exercise_id"), index=True
     )

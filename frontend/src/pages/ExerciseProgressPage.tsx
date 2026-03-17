@@ -37,9 +37,16 @@ export default function ExerciseProgressPage() {
     }
     setSelected(exerciseId);
     setProgressLoading(true);
+    setProgress(null);
     try {
       const p = await getExerciseProgress(exerciseId);
-      setProgress(p);
+      // Проверяем, что пользователь не переключился на другое упражнение
+      setSelected((current) => {
+        if (current === exerciseId) {
+          setProgress(p);
+        }
+        return current;
+      });
     } catch {
       setProgress(null);
     } finally {

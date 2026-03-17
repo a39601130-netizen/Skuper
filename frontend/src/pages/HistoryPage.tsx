@@ -13,6 +13,7 @@ export default function HistoryPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState<number | null>(null);
 
   const load = () => {
     setLoading(true); setError('');
@@ -25,13 +26,17 @@ export default function HistoryPage() {
   useEffect(load, []);
 
   const handleDelete = async (txId: number) => {
+    if (deleting) return;
     if (!confirm('Удалить транзакцию?')) return;
+    setDeleting(txId);
     try {
       await deleteTransaction(txId);
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       load();
     } catch {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -89,12 +94,14 @@ export default function HistoryPage() {
                   <button
                     className="btn-delete"
                     onClick={() => handleDelete(tx.id)}
+                    disabled={deleting === tx.id}
                     style={{
                       background: 'none', border: 'none', color: 'var(--danger)',
                       fontSize: 12, cursor: 'pointer', padding: '4px 0',
+                      opacity: deleting === tx.id ? 0.5 : 1,
                     }}
                   >
-                    Удалить
+                    {deleting === tx.id ? '...' : 'Удалить'}
                   </button>
                 </div>
               </div>

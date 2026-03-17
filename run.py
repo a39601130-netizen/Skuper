@@ -17,8 +17,14 @@ app = create_app()
 
 
 async def main():
+    # Валидация обязательных переменных окружения
+    missing = []
     if not config.TELEGRAM_BOT_TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN не задан!")
+        missing.append("TELEGRAM_BOT_TOKEN")
+    if not config.TELEGRAM_USER_ID:
+        missing.append("TELEGRAM_USER_ID")
+    if missing:
+        logger.error("Отсутствуют переменные окружения: %s", ", ".join(missing))
         return
 
     # Инициализируем PostgreSQL

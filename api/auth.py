@@ -42,13 +42,13 @@ def validate_init_data(init_data: str) -> dict | None:
             secret_key, data_check_string.encode(), hashlib.sha256
         ).hexdigest()
 
-        if calculated_hash != received_hash:
+        if not hmac.compare_digest(calculated_hash, received_hash):
             logger.warning("Auth failed: hash mismatch. Keys in init_data: %s",
                            list(parsed.keys()))
             return None
 
         auth_date = parsed.get("auth_date", [None])[0]
-        if auth_date and (time.time() - int(auth_date)) > 86400:
+        if auth_date and (time.time() - int(auth_date)) > 7200:  # 2 часа
             logger.warning("Auth failed: expired auth_date=%s", auth_date)
             return None
 

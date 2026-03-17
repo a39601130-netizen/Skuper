@@ -95,8 +95,14 @@ async def warmup_done_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     """Фаза разминки выполнена"""
     query = update.callback_query
     await query.answer("✅")
-    
-    phase = int(query.data.split('_')[-1])
+
+    parts = query.data.split('_')
+    if len(parts) < 2:
+        return
+    try:
+        phase = int(parts[-1])
+    except (ValueError, IndexError):
+        return
     phase_key = WARMUP_PHASES[phase]['key']
     context.user_data['workout']['warmup_phases'][phase_key] = True
     
@@ -111,8 +117,14 @@ async def warmup_skip_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     """Пропуск фазы разминки"""
     query = update.callback_query
     await query.answer("⏭️")
-    
-    phase = int(query.data.split('_')[-1])
+
+    parts = query.data.split('_')
+    if len(parts) < 2:
+        return
+    try:
+        phase = int(parts[-1])
+    except (ValueError, IndexError):
+        return
     
     if phase < 4:
         return await _show_warmup_phase(update, context, phase + 1)
@@ -299,7 +311,13 @@ async def rpe_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    rpe = int(query.data.split('_')[1])
+    parts = query.data.split('_')
+    if len(parts) < 2:
+        return
+    try:
+        rpe = int(parts[1])
+    except (ValueError, IndexError):
+        return
     workout_data = context.user_data['workout']
     pending = workout_data.pop('pending_set', {})
     
@@ -365,6 +383,10 @@ async def start_rest_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, s
     old_task = context.user_data['workout'].get('timer_task')
     if old_task and not old_task.done():
         old_task.cancel()
+        try:
+            await old_task
+        except asyncio.CancelledError:
+            pass
 
     # Создаём задачу таймера и сохраняем ссылку
     task = asyncio.create_task(

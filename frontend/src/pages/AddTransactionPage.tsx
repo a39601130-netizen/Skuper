@@ -79,6 +79,8 @@ export default function AddTransactionPage() {
     if (!day || day < 1 || day > 31) return;
     const now = new Date();
     const d = new Date(now.getFullYear(), now.getMonth(), day);
+    // Проверяем, что дата валидна (например, 31 февраля станет 3 марта)
+    if (d.getMonth() !== now.getMonth()) return;
     selectDate(formatDate(d));
   };
 

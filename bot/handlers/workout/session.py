@@ -2,6 +2,7 @@
 Обработчики сессии тренировки
 Начало, завершение, управление состоянием
 """
+import asyncio
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
@@ -143,7 +144,13 @@ async def energy_before_callback(update: Update, context: ContextTypes.DEFAULT_T
     await query.answer()
     
     # Извлекаем значение энергии
-    energy = int(query.data.split('_')[1])
+    parts = query.data.split('_')
+    if len(parts) < 2:
+        return
+    try:
+        energy = int(parts[1])
+    except (ValueError, IndexError):
+        return
     context.user_data['workout']['energy_before'] = energy
     
     # Если энергия низкая - предупреждение от AI
@@ -232,7 +239,13 @@ async def sleep_quality_callback(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
     
-    quality = int(query.data.split('_')[1])
+    parts = query.data.split('_')
+    if len(parts) < 2:
+        return
+    try:
+        quality = int(parts[1])
+    except (ValueError, IndexError):
+        return
     context.user_data['workout']['sleep_quality'] = quality
     
     # Спрашиваем о боли в спине
@@ -253,7 +266,13 @@ async def back_pain_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
-    pain = int(query.data.split('_')[1])
+    parts = query.data.split('_')
+    if len(parts) < 2:
+        return
+    try:
+        pain = int(parts[1])
+    except (ValueError, IndexError):
+        return
     context.user_data['workout']['back_pain'] = pain
 
     # Если боль высокая - предупреждение AI
@@ -293,7 +312,10 @@ async def day_select_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
 
     # Извлекаем выбранный день из callback_data
-    selected_day = query.data.split('_')[-1]  # "select_day_A" -> "A"
+    parts = query.data.split('_')
+    selected_day = parts[-1] if len(parts) >= 3 else "A"
+    if selected_day not in ("A", "B"):
+        selected_day = "A"
 
     # Обновляем день в контексте
     service = get_workout_service()
@@ -387,7 +409,13 @@ async def energy_after_callback(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     
-    energy_after = int(query.data.split('_')[1])
+    parts = query.data.split('_')
+    if len(parts) < 2:
+        return
+    try:
+        energy_after = int(parts[1])
+    except (ValueError, IndexError):
+        return
     workout_data = context.user_data.get('workout', {})
     
     # Сохраняем в таблицу
@@ -492,6 +520,10 @@ async def workout_cancel_callback(update: Update, context: ContextTypes.DEFAULT_
     timer_task = workout_data.get('timer_task')
     if timer_task and not timer_task.done():
         timer_task.cancel()
+        try:
+            await timer_task
+        except asyncio.CancelledError:
+            pass
 
     context.user_data.pop('workout', None)
 

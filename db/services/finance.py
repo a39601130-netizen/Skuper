@@ -1,10 +1,11 @@
 """Finance CRUD operations (PostgreSQL)."""
 
+import calendar
 import logging
 from datetime import date, datetime
 from typing import Optional, List, Dict, Any
 
-from sqlalchemy import select, func, and_, extract
+from sqlalchemy import select, func, and_, extract, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -12,6 +13,18 @@ from db.models import Account, Category, Transaction
 import config
 
 logger = logging.getLogger(__name__)
+
+
+def _get_byn_amount(tx: Transaction) -> float:
+    """Получить сумму в BYN (учитывая обмен валюты)."""
+    return tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
+
+
+def _month_date_range(month: int, year: int) -> tuple[date, date]:
+    """Вернуть первый и последний день месяца."""
+    first_day = date(year, month, 1)
+    last_day = date(year, month, calendar.monthrange(year, month)[1])
+    return first_day, last_day
 
 
 async def get_accounts(db: AsyncSession) -> List[Account]:
@@ -67,6 +80,8 @@ async def add_transaction(
         category = await get_category_by_name(db, category_name, cat_type)
         if category:
             category_id = category.id
+        else:
+            logger.warning("Category not found: %s (type=%s)", category_name, cat_type)
 
     to_account_id = None
     if to_account_name:
@@ -89,19 +104,28 @@ async def add_transaction(
     )
     db.add(tx)
 
-    # Обновляем балансы
+    # Обновляем балансы атомарно через SQL (защита от race condition)
     byn_amount = amount_to if (currency != "BYN" and amount_to) else amount
     if trans_type == "Расход":
-        account.balance -= byn_amount
+        await db.execute(
+            update(Account).where(Account.id == account.id)
+            .values(balance=Account.balance - byn_amount)
+        )
     elif trans_type == "Доход":
-        account.balance += byn_amount
+        await db.execute(
+            update(Account).where(Account.id == account.id)
+            .values(balance=Account.balance + byn_amount)
+        )
     elif trans_type == "Перевод":
-        account.balance -= amount
+        await db.execute(
+            update(Account).where(Account.id == account.id)
+            .values(balance=Account.balance - amount)
+        )
         if to_account_id:
-            result = await db.execute(select(Account).where(Account.id == to_account_id))
-            to_acc = result.scalar_one_or_none()
-            if to_acc:
-                to_acc.balance += amount
+            await db.execute(
+                update(Account).where(Account.id == to_account_id)
+                .values(balance=Account.balance + amount)
+            )
 
     await db.commit()
     await db.refresh(tx)
@@ -147,21 +171,27 @@ async def delete_transaction(db: AsyncSession, tx_id: int) -> bool:
     if not tx:
         return False
 
-    # Откатываем баланс
-    result = await db.execute(select(Account).where(Account.id == tx.account_id))
-    account = result.scalar_one_or_none()
-    if account:
-        byn_amount = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
-        if tx.type == "Расход":
-            account.balance += byn_amount
-        elif tx.type == "Доход":
-            account.balance -= byn_amount
-        elif tx.type == "Перевод" and tx.to_account_id:
-            account.balance += tx.amount
-            result2 = await db.execute(select(Account).where(Account.id == tx.to_account_id))
-            to_acc = result2.scalar_one_or_none()
-            if to_acc:
-                to_acc.balance -= tx.amount
+    # Откатываем баланс атомарно через SQL
+    byn_amount = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
+    if tx.type == "Расход":
+        await db.execute(
+            update(Account).where(Account.id == tx.account_id)
+            .values(balance=Account.balance + byn_amount)
+        )
+    elif tx.type == "Доход":
+        await db.execute(
+            update(Account).where(Account.id == tx.account_id)
+            .values(balance=Account.balance - byn_amount)
+        )
+    elif tx.type == "Перевод" and tx.to_account_id:
+        await db.execute(
+            update(Account).where(Account.id == tx.account_id)
+            .values(balance=Account.balance + tx.amount)
+        )
+        await db.execute(
+            update(Account).where(Account.id == tx.to_account_id)
+            .values(balance=Account.balance - tx.amount)
+        )
 
     await db.delete(tx)
     await db.commit()
@@ -177,21 +207,21 @@ async def get_category_spending(
     today = date.today()
     m = month or today.month
     y = year or today.year
+    first_day, last_day = _month_date_range(m, y)
     result = await db.execute(
         select(Transaction)
         .options(selectinload(Transaction.category))
         .where(
             Transaction.type == "Расход",
-            extract("month", Transaction.date) == m,
-            extract("year", Transaction.date) == y,
+            Transaction.date >= first_day,
+            Transaction.date <= last_day,
         )
     )
     txs = result.scalars().all()
     spending: Dict[str, float] = {}
     for tx in txs:
         cat_name = tx.category.name if tx.category else "Другое"
-        amount = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
-        spending[cat_name] = spending.get(cat_name, 0.0) + amount
+        spending[cat_name] = spending.get(cat_name, 0.0) + _get_byn_amount(tx)
     return spending
 
 
@@ -204,20 +234,20 @@ async def get_daily_spending(
     today = date.today()
     m = month or today.month
     y = year or today.year
+    first_day, last_day = _month_date_range(m, y)
     result = await db.execute(
         select(Transaction)
         .where(
             Transaction.type == "Расход",
-            extract("month", Transaction.date) == m,
-            extract("year", Transaction.date) == y,
+            Transaction.date >= first_day,
+            Transaction.date <= last_day,
         )
     )
     txs = result.scalars().all()
     by_day: Dict[str, float] = {}
     for tx in txs:
         day_str = tx.date.strftime("%Y-%m-%d") if tx.date else str(today)
-        amount = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
-        by_day[day_str] = by_day.get(day_str, 0.0) + amount
+        by_day[day_str] = by_day.get(day_str, 0.0) + _get_byn_amount(tx)
     return [{"date": d, "amount": round(a, 2)} for d, a in sorted(by_day.items())]
 
 
@@ -232,6 +262,7 @@ async def get_monthly_summary(
     year = year or today.year
 
     # Все транзакции текущего месяца
+    first_day, last_day = _month_date_range(month, year)
     result = await db.execute(
         select(Transaction)
         .options(
@@ -239,8 +270,8 @@ async def get_monthly_summary(
             selectinload(Transaction.account),
         )
         .where(
-            extract("month", Transaction.date) == month,
-            extract("year", Transaction.date) == year,
+            Transaction.date >= first_day,
+            Transaction.date <= last_day,
         )
     )
     txs = list(result.scalars().all())
@@ -251,7 +282,7 @@ async def get_monthly_summary(
     expense_by_category: Dict[str, float] = {}
 
     for tx in txs:
-        byn_amount = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
+        byn_amount = _get_byn_amount(tx)
         if tx.type == "Доход":
             total_income += byn_amount
             cat_name = tx.category.name if tx.category else "Другое"
@@ -265,8 +296,7 @@ async def get_monthly_summary(
     expense_by_account: Dict[int, float] = {}
     for tx in txs:
         if tx.type == "Расход":
-            byn = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
-            expense_by_account[tx.account_id] = expense_by_account.get(tx.account_id, 0.0) + byn
+            expense_by_account[tx.account_id] = expense_by_account.get(tx.account_id, 0.0) + _get_byn_amount(tx)
 
     # Счета
     accounts = await get_accounts(db)
@@ -330,13 +360,14 @@ async def get_income_by_days(
     month = month or today.month
     year = year or today.year
 
+    first_day, last_day = _month_date_range(month, year)
     result = await db.execute(
         select(Transaction)
         .options(selectinload(Transaction.category))
         .where(
             Transaction.type == "Доход",
-            extract("month", Transaction.date) == month,
-            extract("year", Transaction.date) == year,
+            Transaction.date >= first_day,
+            Transaction.date <= last_day,
         )
         .order_by(Transaction.date)
     )
@@ -356,7 +387,7 @@ async def get_income_by_days(
                 "hours": 0.0,
                 "transactions": [],
             }
-        byn = tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
+        byn = _get_byn_amount(tx)
         income_by_day[day_key]["total"] += byn
 
         cat_name = tx.category.name if tx.category else ""
@@ -400,21 +431,13 @@ async def get_weekly_summary(db: AsyncSession, days_back: int = 7) -> Dict[str, 
     )
     txs = list(result.scalars().all())
 
-    income = sum(
-        (tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount)
-        for tx in txs if tx.type == "Доход"
-    )
-    expense = sum(
-        (tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount)
-        for tx in txs if tx.type == "Расход"
-    )
+    income = sum(_get_byn_amount(tx) for tx in txs if tx.type == "Доход")
+    expense = sum(_get_byn_amount(tx) for tx in txs if tx.type == "Расход")
     by_category: Dict[str, float] = {}
     for tx in txs:
         if tx.type == "Расход":
             cat_name = tx.category.name if tx.category else "Другое"
-            by_category[cat_name] = by_category.get(cat_name, 0.0) + (
-                tx.amount_to if (tx.currency != "BYN" and tx.amount_to) else tx.amount
-            )
+            by_category[cat_name] = by_category.get(cat_name, 0.0) + _get_byn_amount(tx)
 
     return {
         "from_date": from_date.isoformat(),

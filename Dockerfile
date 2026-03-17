@@ -29,5 +29,9 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 # Создаём директорию для логов
 RUN mkdir -p logs
 
+# Запуск от непривилегированного пользователя
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 # Запуск: FastAPI + Telegram bot polling
 CMD ["python", "run.py"]

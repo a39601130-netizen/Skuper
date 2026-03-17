@@ -1,5 +1,6 @@
 """Recurring transactions CRUD (PostgreSQL)."""
 
+import calendar
 from datetime import date, timedelta
 from typing import Optional, List, Dict, Any
 
@@ -106,7 +107,8 @@ async def apply_recurring_transaction(db: AsyncSession, rt_id: int) -> Optional[
     elif rt.frequency == "monthly":
         month = rt.next_date.month % 12 + 1
         year = rt.next_date.year + (1 if rt.next_date.month == 12 else 0)
-        day = min(rt.next_date.day, 28)
+        max_day = calendar.monthrange(year, month)[1]
+        day = min(rt.next_date.day, max_day)
         rt.next_date = date(year, month, day)
 
     await db.commit()
