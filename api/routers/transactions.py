@@ -1,9 +1,10 @@
 """API роутер: транзакции (PostgreSQL)."""
 
 from datetime import date
+from typing import Annotated, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, field_validator
-from typing import Optional, Union
+from pydantic import BaseModel, BeforeValidator, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
@@ -15,8 +16,19 @@ router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 VALID_TYPES = {"Расход", "Доход", "Перевод", "Обмен валюты"}
 
 
+def _parse_optional_date(v):
+    if v is None:
+        return None
+    if isinstance(v, str):
+        return date.fromisoformat(v)
+    return v
+
+
+OptionalDate = Annotated[Optional[date], BeforeValidator(_parse_optional_date)]
+
+
 class TransactionCreate(BaseModel):
-    date: Optional[date] = None
+    date: OptionalDate = None
     type: str
     account: str
     category: Optional[str] = None
@@ -27,13 +39,6 @@ class TransactionCreate(BaseModel):
     exchange_rate: Optional[float] = None
     amount_to: Optional[float] = None
     currency: str = "BYN"
-
-    @field_validator("date", mode="before")
-    @classmethod
-    def parse_date(cls, v):
-        if isinstance(v, str):
-            return date.fromisoformat(v)
-        return v
 
     @field_validator("amount")
     @classmethod
