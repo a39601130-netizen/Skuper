@@ -13,6 +13,11 @@ import type {
   IncomeStats,
   WeeklySummary,
   ExerciseProgress,
+  WorkoutCreateData,
+  WorkoutFull,
+  SetCreateData,
+  WorkoutSetData,
+  NextWorkoutFull,
 } from '../types';
 
 const API_BASE = '/api';
@@ -97,6 +102,29 @@ export const getExercises = (day?: 'A' | 'B') =>
 
 export const getExerciseProgress = (exerciseId: string) =>
   request<ExerciseProgress>(`/exercises/${exerciseId}/progress`);
+
+// --- Workout Session ---
+export const getNextWorkoutFull = () => request<NextWorkoutFull>('/workouts/next');
+
+export const createWorkout = (data: WorkoutCreateData) =>
+  request<WorkoutFull>('/workouts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const getWorkout = (id: number) => request<WorkoutFull>(`/workouts/${id}`);
+
+export const addWorkoutSet = (workoutId: number, data: SetCreateData) =>
+  request<WorkoutSetData>(`/workouts/${workoutId}/sets`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const completeWorkout = (workoutId: number, energyAfter: number, notes?: string) =>
+  request<WorkoutFull>(`/workouts/${workoutId}/complete`, {
+    method: 'PUT',
+    body: JSON.stringify({ energy_after: energyAfter, notes }),
+  });
 
 // --- Advisor ---
 export const askAdvisor = (question: string, contextType = 'finance', mode = 'default') =>

@@ -1,0 +1,617 @@
+/* ==================== Workout Session ==================== */
+
+.ws-page {
+  padding-bottom: 16px !important;
+}
+
+/* Progress bar */
+.ws-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--border);
+  z-index: 50;
+}
+
+.ws-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  border-radius: 0 2px 2px 0;
+  transition: width 0.5s ease;
+}
+
+/* Stage container */
+.ws-stage {
+  padding-top: 8px;
+  animation: ws-fadeIn 0.3s ease;
+}
+
+@keyframes ws-fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Header */
+.ws-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.ws-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.ws-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Card */
+.ws-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.ws-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.ws-card-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.ws-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+/* Step indicator */
+.ws-step-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ws-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: all 0.3s;
+}
+
+.ws-step-dot.active {
+  background: var(--accent);
+  transform: scale(1.2);
+}
+
+/* Slider */
+.ws-slider-group {
+  margin: 8px 0;
+}
+
+.ws-slider-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.ws-slider-value {
+  font-weight: 700;
+  font-size: 20px;
+}
+
+.ws-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 3px;
+  outline: none;
+}
+
+.ws-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 3px solid var(--bg-card);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.ws-slider-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Wave buttons */
+.ws-wave-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.ws-wave-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 8px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ws-wave-btn.active {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.ws-wave-icon {
+  font-size: 28px;
+}
+
+/* Warning */
+.ws-warning {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Actions */
+.ws-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ---- Warmup ---- */
+.ws-warmup-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 8px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.ws-warmup-item.done {
+  border-color: var(--success);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.ws-warmup-check {
+  font-size: 20px;
+  margin-top: 2px;
+}
+
+.ws-warmup-content {
+  flex: 1;
+}
+
+.ws-warmup-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.ws-warmup-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* ---- Exercise ---- */
+.ws-ex-counter {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.ws-ex-info {
+  padding: 12px;
+}
+
+.ws-ex-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+
+.ws-ex-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ws-ex-stat-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ws-ex-stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Sets log */
+.ws-sets-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ws-set-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ws-set-row:last-child {
+  border-bottom: none;
+}
+
+.ws-set-num {
+  font-weight: 600;
+  color: var(--accent);
+  width: 28px;
+}
+
+.ws-set-rpe {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* History */
+.ws-history-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 0;
+  color: var(--text-secondary);
+}
+
+.ws-history-date {
+  color: var(--text-muted);
+}
+
+/* Set input */
+.ws-set-input {
+  padding: 16px;
+}
+
+.ws-input-row {
+  margin-bottom: 14px;
+}
+
+.ws-input-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.ws-input-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ws-adj-btn {
+  width: 56px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.ws-adj-btn:active {
+  background: var(--accent);
+}
+
+.ws-weight-input {
+  flex: 1;
+  height: 44px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.ws-weight-input:focus {
+  border-color: var(--accent);
+}
+
+/* RPE grid */
+.ws-rpe-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.ws-rpe-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 8px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ws-rpe-btn:active {
+  transform: scale(0.95);
+}
+
+.ws-rpe-btn.easy {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.ws-rpe-btn.easy:active {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.ws-rpe-btn.medium {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.ws-rpe-btn.medium:active {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.ws-rpe-btn.hard {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.ws-rpe-btn.hard:active {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.ws-rpe-num {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.ws-rpe-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ---- Rest Timer ---- */
+.ws-rest-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ws-timer-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 24px auto;
+}
+
+.ws-timer-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 42px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Post workout ---- */
+.ws-notes {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+
+.ws-notes:focus {
+  border-color: var(--accent);
+}
+
+/* ---- Summary ---- */
+.ws-summary-energy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.ws-energy-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ws-energy-val {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.ws-energy-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ws-energy-arrow {
+  font-size: 28px;
+}
+
+.ws-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.ws-summary-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.ws-summary-val {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.ws-summary-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ws-summary-exercise {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ws-summary-exercise:last-child {
+  border-bottom: none;
+}
+
+.ws-summary-ex-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.ws-summary-ex-detail {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ws-summary-ex-rpe {
+  margin-left: 8px;
+  color: var(--text-muted);
+}
+
+/* Progress item */
+.ws-progress-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ws-progress-item:last-child {
+  border-bottom: none;
+}
+
+.ws-progress-item.ready {
+  color: var(--success);
+}
+
+/* Muscle groups */
+.ws-muscle-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ws-muscle-row:last-child {
+  border-bottom: none;
+}
+
+/* ---- Confetti ---- */
+.ws-confetti {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 200;
+  overflow: hidden;
+}
+
+.ws-confetti-piece {
+  position: absolute;
+  top: -10px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  animation: ws-confetti-fall 2.5s ease-out forwards;
+}
+
+@keyframes ws-confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}

@@ -95,6 +95,11 @@ export default function WorkoutsPage() {
               </div>
             ))}
           </div>
+
+          <button className="btn btn-primary" style={{ width: '100%', marginTop: 16, padding: '14px 0', fontSize: 16 }}
+            onClick={() => navigate('/workout/session')}>
+            💪 Начать тренировку
+          </button>
         </>
       )}
 

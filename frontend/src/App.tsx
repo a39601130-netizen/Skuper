@@ -9,6 +9,7 @@ import IncomeStatsPage from './pages/IncomeStatsPage';
 import WeeklyReportPage from './pages/WeeklyReportPage';
 import WorkoutHistoryPage from './pages/WorkoutHistoryPage';
 import ExerciseProgressPage from './pages/ExerciseProgressPage';
+import WorkoutSessionPage from './pages/WorkoutSessionPage';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/workouts" element={<WorkoutsPage />} />
         <Route path="/workout-history" element={<WorkoutHistoryPage />} />
         <Route path="/exercise-progress" element={<ExerciseProgressPage />} />
+        <Route path="/workout/session" element={<WorkoutSessionPage />} />
         <Route path="/advisor" element={<AdvisorPage />} />
       </Routes>
       <BottomNav />

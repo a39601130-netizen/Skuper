@@ -80,15 +80,7 @@ frontend/
         ExpensePieChart.tsx      — Pie chart расходов по категориям (recharts)
         SpendingTrendChart.tsx   — Line chart расходов по дням (recharts)
         ExerciseProgressChart.tsx — Line chart прогресса упражнения (recharts)
-      workout/
-        PreWorkoutForm.tsx       — Форма перед тренировкой (энергия, сон, боль, волна)
-        WarmupPhase.tsx          — 4 фазы разминки
-        SetInput.tsx             — Ввод веса × повторений
-        RPESelector.tsx          — Выбор RPE 1-10
-        RestTimer.tsx            — Таймер отдыха с HapticFeedback
-        WorkoutSummary.tsx       — Итоги тренировки
-        WorkoutCalendar.tsx      — Месячный календарь тренировок А/В
-        WorkoutComparison.tsx    — Сравнение тренировок side-by-side
+      (workout components встроены в WorkoutSessionPage)
     pages/
       DashboardPage.tsx          — Сводка, счета (multi-currency), категории, графики,
                                    AI инсайты, повторяющиеся транзакции
@@ -98,6 +90,7 @@ frontend/
       AdvisorPage.tsx            — AI советник с localStorage историей и screen_context
       WorkoutSessionPage.tsx     — Полная сессия: pre→warmup→упражнения→RPE→таймер→итоги
     styles/global.css            — Dark theme, CSS variables, mobile-first
+    styles/workout-session.css   — Стили тренировочной сессии
     types/index.ts               — TypeScript типы (Transaction, Workout, Recurring...)
 
 main.py                          — Telegram bot: create_application(), _register_handlers()

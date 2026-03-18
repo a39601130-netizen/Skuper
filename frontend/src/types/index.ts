@@ -228,6 +228,76 @@ export interface WeeklySummary {
   transaction_count: number;
 }
 
+// Workout Session types
+export interface WorkoutCreateData {
+  day_type: string;
+  week: number;
+  phase: string;
+  energy_before: number;
+  sleep_hours: number;
+  sleep_quality: number;
+  back_pain: number;
+  emotional_wave: string;
+}
+
+export interface WorkoutFull {
+  id: number;
+  date: string;
+  day_type: string;
+  week: number;
+  phase: string;
+  energy_before: number;
+  energy_after: number | null;
+  sleep_hours: number;
+  sleep_quality: number;
+  back_pain: number;
+  emotional_wave: string;
+  notes: string;
+  sets: WorkoutSetData[];
+  progress_updates?: ProgressUpdate[];
+}
+
+export interface ProgressUpdate {
+  exercise_id: string;
+  weight: number;
+  avg_rpe: number;
+  status: string;
+  weight_step: number;
+}
+
+export interface SetCreateData {
+  exercise_id: string;
+  set_number: number;
+  weight: number;
+  reps: number;
+  rpe?: number;
+  notes?: string;
+}
+
+export interface ExerciseWithDetails extends Exercise {
+  current_weight: number;
+  target_reps: string;
+  status: string;
+  last_sets: number[];
+  history: WorkoutSetGroup[];
+  reps_min?: number;
+  reps_max?: number;
+  rest_seconds?: number;
+  default_sets?: number;
+}
+
+export interface NextWorkoutFull {
+  next_day: string;
+  phase: {
+    current_week: number;
+    phase_name: string;
+    rpe_min: number;
+    rpe_max: number;
+    sets_modifier: number;
+  };
+  exercises: ExerciseWithDetails[];
+}
+
 // Advisor types
 export interface AdvisorResponse {
   response: string;

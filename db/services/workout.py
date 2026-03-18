@@ -207,6 +207,10 @@ def _exercise_to_dict(e: Exercise) -> Dict:
         "order": e.order,
         "category": e.category or "",
         "weight_step": e.weight_step,
+        "reps_min": e.reps_min,
+        "reps_max": e.reps_max,
+        "rest_seconds": e.rest_seconds,
+        "default_sets": e.default_sets,
     }
 
 
@@ -218,6 +222,163 @@ def _weight_to_dict(w: CurrentWeight) -> Dict:
         "last_sets": w.last_sets or [],
         "status": w.status or "",
     }
+
+
+async def create_workout(
+    db: AsyncSession,
+    day_type: str,
+    week: int,
+    phase: str,
+    energy_before: int,
+    sleep_hours: float,
+    sleep_quality: int,
+    back_pain: int,
+    emotional_wave: str,
+) -> Dict:
+    """Создать новую тренировку."""
+    workout = Workout(
+        date=date.today(),
+        day_type=day_type,
+        week=week,
+        phase=phase,
+        energy_before=energy_before,
+        sleep_hours=sleep_hours,
+        sleep_quality=sleep_quality,
+        back_pain=back_pain,
+        emotional_wave=emotional_wave,
+    )
+    db.add(workout)
+    await db.commit()
+    await db.refresh(workout)
+    logger.info(f"Created workout #{workout.id} day={day_type}")
+    return _workout_to_dict(workout)
+
+
+async def get_workout_by_id(db: AsyncSession, workout_id: int) -> Optional[Dict]:
+    """Получить тренировку с подходами."""
+    result = await db.execute(
+        select(Workout)
+        .options(selectinload(Workout.sets))
+        .where(Workout.id == workout_id)
+    )
+    w = result.scalar_one_or_none()
+    if not w:
+        return None
+    d = _workout_to_dict(w)
+    d["sets"] = [
+        {
+            "id": s.id,
+            "exercise_id": s.exercise_id,
+            "set_number": s.set_number,
+            "weight": s.weight,
+            "reps": s.reps,
+            "rpe": s.rpe,
+            "notes": s.notes or "",
+        }
+        for s in sorted(w.sets, key=lambda x: (x.exercise_id, x.set_number))
+    ]
+    return d
+
+
+async def add_workout_set(
+    db: AsyncSession,
+    workout_id: int,
+    exercise_id: str,
+    set_number: int,
+    weight: float,
+    reps: int,
+    rpe: Optional[int] = None,
+    notes: Optional[str] = None,
+) -> Dict:
+    """Добавить подход к тренировке."""
+    ws = WorkoutSet(
+        workout_id=workout_id,
+        exercise_id=exercise_id,
+        set_number=set_number,
+        weight=weight,
+        reps=reps,
+        rpe=rpe,
+        notes=notes,
+    )
+    db.add(ws)
+    await db.commit()
+    await db.refresh(ws)
+    logger.info(f"Added set #{ws.id} to workout #{workout_id}: {exercise_id} {weight}x{reps}")
+    return {
+        "id": ws.id,
+        "exercise_id": ws.exercise_id,
+        "set_number": ws.set_number,
+        "weight": ws.weight,
+        "reps": ws.reps,
+        "rpe": ws.rpe,
+        "notes": ws.notes or "",
+    }
+
+
+async def complete_workout(
+    db: AsyncSession,
+    workout_id: int,
+    energy_after: int,
+    notes: Optional[str] = None,
+) -> Optional[Dict]:
+    """Завершить тренировку: energy_after + обновить текущие веса."""
+    result = await db.execute(
+        select(Workout)
+        .options(selectinload(Workout.sets))
+        .where(Workout.id == workout_id)
+    )
+    w = result.scalar_one_or_none()
+    if not w:
+        return None
+
+    w.energy_after = energy_after
+    if notes:
+        w.notes = notes
+
+    # Обновляем текущие веса по результатам тренировки
+    sets_by_exercise: Dict[str, List[WorkoutSet]] = {}
+    for s in w.sets:
+        sets_by_exercise.setdefault(s.exercise_id, []).append(s)
+
+    progress_updates = []
+    for exercise_id, sets in sets_by_exercise.items():
+        sets_sorted = sorted(sets, key=lambda x: x.set_number)
+        last_weight = sets_sorted[-1].weight
+        last_reps = [s.reps for s in sets_sorted[-4:]]
+        last_rpes = [s.rpe for s in sets_sorted[-4:] if s.rpe]
+        avg_rpe = sum(last_rpes) / len(last_rpes) if last_rpes else 0
+
+        # Проверяем прогресс: все подходы RPE <= 8 и reps >= target
+        ex_result = await db.execute(
+            select(Exercise).where(Exercise.exercise_id == exercise_id)
+        )
+        exercise = ex_result.scalar_one_or_none()
+
+        status = "in_progress"
+        if exercise and avg_rpe > 0:
+            all_reps_ok = all(r >= exercise.reps_min for r in last_reps)
+            rpe_ok = avg_rpe <= 8
+            if all_reps_ok and rpe_ok and len(last_reps) >= exercise.default_sets:
+                status = "ready"
+
+        target_reps = f"{exercise.reps_min}-{exercise.reps_max}" if exercise else ""
+        await update_current_weight(
+            db, exercise_id, last_weight, target_reps,
+            last_sets=last_reps, status=status,
+        )
+        progress_updates.append({
+            "exercise_id": exercise_id,
+            "weight": last_weight,
+            "avg_rpe": round(avg_rpe, 1),
+            "status": status,
+            "weight_step": exercise.weight_step if exercise else 2.5,
+        })
+
+    await db.commit()
+
+    d = _workout_to_dict(w)
+    d["progress_updates"] = progress_updates
+    return d
 
 
 def _workout_to_dict(w: Workout) -> Dict:
