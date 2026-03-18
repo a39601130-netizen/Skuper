@@ -6,7 +6,6 @@ import {
 } from '../api/client';
 import type {
   NextWorkoutFull, ExerciseWithDetails, WorkoutFull,
-  WorkoutSetData, ProgressUpdate,
 } from '../types';
 import '../styles/workout-session.css';
 
@@ -90,7 +89,7 @@ export default function WorkoutSessionPage() {
   const [setNum, setSetNum] = useState(1);
   const [setWeight, setSetWeight] = useState(0);
   const [setReps, setSetReps] = useState(0);
-  const [setRpe, setSetRpe] = useState(0);
+  const [, setSetRpe] = useState(0);
   const [setsLog, setSetsLog] = useState<Record<string, SetEntry[]>>({});
   const [showRpe, setShowRpe] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -876,7 +875,7 @@ export default function WorkoutSessionPage() {
                 <div key={ex.exercise_id} className="ws-summary-exercise">
                   <div className="ws-summary-ex-name">{ex.name}</div>
                   <div className="ws-summary-ex-detail">
-                    {sets.map((s, i) => `${s.weight}x${s.reps}`).join(' | ')}
+                    {sets.map((s) => `${s.weight}x${s.reps}`).join(' | ')}
                     <span className="ws-summary-ex-rpe">RPE {avgRpe.toFixed(1)}</span>
                   </div>
                 </div>
