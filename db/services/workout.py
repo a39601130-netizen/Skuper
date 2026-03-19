@@ -42,15 +42,92 @@ async def get_workout_history(db: AsyncSession, limit: int = 10) -> List[Dict]:
 
 
 async def delete_workout(db: AsyncSession, workout_id: int) -> bool:
-    """Удалить тренировку и все её подходы (cascade)."""
-    result = await db.execute(select(Workout).where(Workout.id == workout_id))
+    """Удалить тренировку и пересчитать CurrentWeight по оставшимся данным."""
+    result = await db.execute(
+        select(Workout).options(selectinload(Workout.sets)).where(Workout.id == workout_id)
+    )
     workout = result.scalar_one_or_none()
     if not workout:
         return False
+
+    # Запоминаем упражнения из удаляемой тренировки
+    affected_exercises = set(s.exercise_id for s in workout.sets)
+
     await db.delete(workout)
+    await db.flush()
+
+    # Пересчитываем CurrentWeight для затронутых упражнений
+    for exercise_id in affected_exercises:
+        await _recalc_current_weight(db, exercise_id)
+
     await db.commit()
-    logger.info(f"Deleted workout {workout_id}")
+    logger.info(f"Deleted workout {workout_id}, recalculated weights for {len(affected_exercises)} exercises")
     return True
+
+
+async def _recalc_current_weight(db: AsyncSession, exercise_id: str):
+    """Пересчитать CurrentWeight по последней оставшейся тренировке."""
+    # Находим последние подходы этого упражнения
+    last_sets_result = await db.execute(
+        select(WorkoutSet)
+        .join(Workout)
+        .where(WorkoutSet.exercise_id == exercise_id)
+        .order_by(desc(Workout.date), desc(WorkoutSet.set_number))
+        .limit(10)
+    )
+    last_sets = last_sets_result.scalars().all()
+
+    cw_result = await db.execute(
+        select(CurrentWeight).where(CurrentWeight.exercise_id == exercise_id)
+    )
+    cw = cw_result.scalar_one_or_none()
+
+    if not last_sets:
+        # Нет больше данных — сбрасываем
+        if cw:
+            cw.last_sets = []
+            cw.status = None
+        return
+
+    # Берём данные из последней тренировки
+    last_workout_id = last_sets[0].workout_id
+    workout_sets = [s for s in last_sets if s.workout_id == last_workout_id]
+    workout_sets.sort(key=lambda x: x.set_number)
+
+    last_weight = workout_sets[-1].weight
+    last_reps = [s.reps for s in workout_sets[-4:]]
+    last_rpes = [s.rpe for s in workout_sets[-4:] if s.rpe]
+    avg_rpe = sum(last_rpes) / len(last_rpes) if last_rpes else 0
+
+    # Определяем статус
+    ex_result = await db.execute(
+        select(Exercise).where(Exercise.exercise_id == exercise_id)
+    )
+    exercise = ex_result.scalar_one_or_none()
+
+    status = "in_progress"
+    if exercise and avg_rpe > 0:
+        all_reps_ok = all(r >= exercise.reps_min for r in last_reps)
+        rpe_ok = avg_rpe <= 8
+        if all_reps_ok and rpe_ok and len(last_reps) >= exercise.default_sets:
+            status = "ready"
+
+    target_reps = f"{exercise.reps_min}-{exercise.reps_max}" if exercise else ""
+
+    if cw:
+        cw.weight = last_weight
+        cw.target_reps = target_reps
+        cw.last_sets = last_reps
+        cw.status = status
+    else:
+        cw = CurrentWeight(
+            exercise_id=exercise_id,
+            weight=last_weight,
+            target_reps=target_reps,
+            last_sets=last_reps,
+            status=status,
+        )
+        db.add(cw)
 
 
 async def get_last_workout(db: AsyncSession) -> Optional[Dict]:
