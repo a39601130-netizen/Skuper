@@ -135,7 +135,7 @@ export default function DashboardPage() {
           <div className="card-title" style={{ color: 'var(--danger)' }}>Бюджет превышен</div>
           {summary.over_budget.map((cat) => (
             <div key={cat.name} style={{ marginBottom: 4 }}>
-              {cat.emoji} {cat.name}: {cat.spent.toFixed(0)} / {cat.budget.toFixed(0)} BYN
+              {cat.emoji} {cat.name}: {cat.spent.toFixed(2)} / {cat.budget.toFixed(0)} BYN
             </div>
           ))}
         </div>
@@ -145,7 +145,7 @@ export default function DashboardPage() {
           <div className="card-title" style={{ color: 'var(--warning)' }}>Близко к лимиту</div>
           {summary.near_limit.map((cat) => (
             <div key={cat.name} style={{ marginBottom: 4 }}>
-              {cat.emoji} {cat.name}: {cat.spent.toFixed(0)} / {cat.budget.toFixed(0)} BYN
+              {cat.emoji} {cat.name}: {cat.spent.toFixed(2)} / {cat.budget.toFixed(0)} BYN
             </div>
           ))}
         </div>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                   <span>{cat.emoji} {cat.name}</span>
                   <span className="amount expense">
-                    {cat.spent.toFixed(0)}
+                    {cat.spent.toFixed(2)}
                     {cat.budget > 0 && <span className="stat-label"> / {cat.budget.toFixed(0)}</span>}
                   </span>
                 </div>

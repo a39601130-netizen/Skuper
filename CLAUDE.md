@@ -102,7 +102,7 @@ bot/
     balance.py                   — /balance, /stats, /history, /income
     advisor.py                   — /advisor — AI советник
     reports.py                   — /report — еженедельный отчёт
-    debug_commands.py            — /debug_* команды
+    debug_commands.py            — /bugs, /clear_bugs, /sync_balances
     workout/
       session.py                 — /workout — сессия тренировки
       exercises.py               — Логика упражнений, подходов, RPE
@@ -168,6 +168,7 @@ Telegram Mini App присылает `X-Telegram-Init-Data` заголовок.
 | /workout | workout_command | workout/session.py |
 | /weights | current_weights_command | workout/progress.py |
 | /progress | progress_command | workout/progress.py |
+| /sync_balances | sync_balances_command | debug_commands.py |
 
 ## Деплой (Docker Compose)
 - Сервер: VPS (193.106.251.72), `ssh bot`, `~/Artur/Skuper`

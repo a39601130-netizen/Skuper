@@ -41,6 +41,18 @@ async def get_workout_history(db: AsyncSession, limit: int = 10) -> List[Dict]:
     return [_workout_to_dict(w) for w in workouts]
 
 
+async def delete_workout(db: AsyncSession, workout_id: int) -> bool:
+    """Удалить тренировку и все её подходы (cascade)."""
+    result = await db.execute(select(Workout).where(Workout.id == workout_id))
+    workout = result.scalar_one_or_none()
+    if not workout:
+        return False
+    await db.delete(workout)
+    await db.commit()
+    logger.info(f"Deleted workout {workout_id}")
+    return True
+
+
 async def get_last_workout(db: AsyncSession) -> Optional[Dict]:
     result = await db.execute(
         select(Workout).order_by(desc(Workout.date)).limit(1)

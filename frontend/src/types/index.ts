@@ -131,6 +131,7 @@ export interface Exercise {
 }
 
 export interface WorkoutHistory {
+  id: number;
   date: string;
   day_type: string;
   week: number;

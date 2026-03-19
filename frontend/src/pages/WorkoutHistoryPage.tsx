@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getWorkoutHistory } from '../api/client';
+import { getWorkoutHistory, deleteWorkout2 } from '../api/client';
 import type { WorkoutHistory } from '../types';
+import SwipeableListItem from '../components/SwipeableListItem';
 
 export default function WorkoutHistoryPage() {
   const navigate = useNavigate();
@@ -18,6 +19,17 @@ export default function WorkoutHistoryPage() {
   };
 
   useEffect(load, []);
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteWorkout2(id);
+      setHistory((prev) => prev.filter((w) => w.id !== id));
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Ошибка удаления';
+      setError(msg);
+    }
+  };
 
   if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
   if (error) return (
@@ -47,28 +59,30 @@ export default function WorkoutHistoryPage() {
         </div>
       ) : (
         <div className="card" style={{ padding: 0 }}>
-          {history.map((w, i) => (
-            <div className="list-item" key={i} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontWeight: 600 }}>
-                  День {w.day_type} · Неделя {w.week}
-                </span>
-                <span className="stat-label">{w.date}</span>
-              </div>
-              <div style={{ display: 'flex', gap: 12, fontSize: 13, color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-                <span>Фаза: {w.phase}</span>
-                {w.energy_before > 0 && <span>⚡ {w.energy_before}→{w.energy_after}</span>}
-                {w.sleep_hours > 0 && <span>😴 {w.sleep_hours}ч</span>}
-                {w.sleep_quality && <span>💤 {w.sleep_quality}</span>}
-                {w.back_pain && <span>🔙 {w.back_pain}</span>}
-                {w.emotional_wave && <span>🌊 {w.emotional_wave}</span>}
-              </div>
-              {w.notes && (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                  {w.notes}
+          {history.map((w) => (
+            <SwipeableListItem key={w.id} onDelete={() => handleDelete(w.id)}>
+              <div className="list-item" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600 }}>
+                    День {w.day_type} · Неделя {w.week}
+                  </span>
+                  <span className="stat-label">{w.date}</span>
                 </div>
-              )}
-            </div>
+                <div style={{ display: 'flex', gap: 12, fontSize: 13, color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                  <span>Фаза: {w.phase}</span>
+                  {w.energy_before > 0 && <span>⚡ {w.energy_before}→{w.energy_after}</span>}
+                  {w.sleep_hours > 0 && <span>😴 {w.sleep_hours}ч</span>}
+                  {w.sleep_quality && <span>💤 {w.sleep_quality}</span>}
+                  {w.back_pain && <span>🔙 {w.back_pain}</span>}
+                  {w.emotional_wave && <span>🌊 {w.emotional_wave}</span>}
+                </div>
+                {w.notes && (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                    {w.notes}
+                  </div>
+                )}
+              </div>
+            </SwipeableListItem>
           ))}
         </div>
       )}

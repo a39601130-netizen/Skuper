@@ -96,7 +96,7 @@ from bot.handlers.reports import (
 )
 
 # Handlers - Debug
-from bot.handlers.debug_commands import bugs_command, clear_bugs_command
+from bot.handlers.debug_commands import bugs_command, clear_bugs_command, sync_balances_command
 
 # Handlers - Workout
 from bot.handlers.workout.session import (
@@ -744,6 +744,7 @@ def _register_handlers(application):
     application.add_handler(CommandHandler("weekly", weekly_report_command))
     application.add_handler(CommandHandler("bugs", bugs_command))
     application.add_handler(CommandHandler("clear_bugs", clear_bugs_command))
+    application.add_handler(CommandHandler("sync_balances", sync_balances_command))
 
     add_conv_handler = ConversationHandler(
         entry_points=[

@@ -93,6 +93,9 @@ export const getWeeklySummary = (daysBack = 7) =>
 export const getWorkoutHistory = (limit = 10) =>
   request<WorkoutHistory[]>(`/workouts/history?limit=${limit}`);
 
+export const deleteWorkout2 = (workoutId: number) =>
+  request<{ status: string }>(`/workouts/${workoutId}`, { method: 'DELETE' });
+
 export const getNextWorkout = () => request<NextWorkout>('/workouts/next');
 export const getCurrentWeights = () => request<ExerciseWeight[]>('/workouts/weights');
 

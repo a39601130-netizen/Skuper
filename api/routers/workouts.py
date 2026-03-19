@@ -12,7 +12,7 @@ from db.services.workout import (
     get_current_weights, get_workout_history,
     determine_next_day, get_current_week_and_phase, get_exercises,
     create_workout, get_workout_by_id, add_workout_set, complete_workout,
-    get_exercise_progress,
+    get_exercise_progress, delete_workout,
 )
 
 router = APIRouter(prefix="/api/workouts", tags=["workouts"])
@@ -118,6 +118,18 @@ async def create_workout_endpoint(
         emotional_wave=data.emotional_wave,
     )
     return result
+
+
+@router.delete("/{workout_id}")
+async def delete_workout_endpoint(
+    workout_id: int,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    deleted = await delete_workout(db, workout_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Тренировка не найдена")
+    return {"status": "ok"}
 
 
 @router.get("/{workout_id}")
