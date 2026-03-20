@@ -89,8 +89,8 @@ export default function IncomeStatsPage() {
           <div className="stat-value amount income">{stats.total_income.toFixed(2)} BYN</div>
         </div>
         <div className="card">
-          <div className="card-title">Часов</div>
-          <div className="stat-value">{stats.total_hours.toFixed(1)}</div>
+          <div className="card-title">Смен / Часов</div>
+          <div className="stat-value">{stats.days.filter(d => d.hours > 0).length} / {stats.total_hours.toFixed(1)}</div>
         </div>
       </div>
 
@@ -109,63 +109,34 @@ export default function IncomeStatsPage() {
       {stats.days.length === 0 ? (
         <div className="empty">Нет доходов за этот месяц</div>
       ) : (
-        <>
-          <div className="card" style={{ padding: 0 }}>
-            {stats.days.map((day) => {
-              const basePay = day.hours > 0 ? day.hours * stats.base_hourly_rate : 0;
-              const realRate = day.hours > 0 ? (day.total / day.hours).toFixed(2) : null;
-              const comments = day.transactions.filter(t => t.comment).map(t => t.comment);
-              return (
-                <div className="list-item" key={day.day} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 600 }}>{day.date}</span>
-                    <span className="amount income">+{day.total.toFixed(2)} BYN</span>
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {day.tips > 0 && <span>💵 Чаевые: {day.tips.toFixed(0)} BYN</span>}
-                    {basePay > 0 && (
-                      <span>💰 ЗП: {basePay.toFixed(2)} BYN ({day.hours}ч × {stats.base_hourly_rate})</span>
-                    )}
-                    {day.other > 0 && <span>📦 Прочее: {day.other.toFixed(0)} BYN</span>}
-                    {realRate && <span>⏱ Реальная ставка: {realRate} BYN/ч</span>}
-                  </div>
-                  {comments.length > 0 && (
-                    <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
-                      {comments.map((c, i) => <div key={i}>💬 {c}</div>)}
-                    </div>
+        <div className="card" style={{ padding: 0 }}>
+          {stats.days.map((day) => {
+            const basePay = day.hours > 0 ? day.hours * stats.base_hourly_rate : 0;
+            const realRate = day.hours > 0 ? (day.total / day.hours).toFixed(2) : null;
+            const comments = day.transactions.filter(t => t.comment).map(t => t.comment);
+            return (
+              <div className="list-item" key={day.day} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600 }}>{day.date}</span>
+                  <span className="amount income">+{day.total.toFixed(2)} BYN</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {day.tips > 0 && <span>💵 Чаевые: {day.tips.toFixed(0)} BYN</span>}
+                  {day.salary > 0 && <span>💰 Зарплата: {day.salary.toFixed(2)} BYN</span>}
+                  {day.other > 0 && <span>📦 Прочее: {day.other.toFixed(0)} BYN</span>}
+                  {basePay > 0 && (
+                    <span>📋 Ставка: {basePay.toFixed(2)} BYN ({day.hours}ч × {stats.base_hourly_rate}) → {realRate} BYN/ч</span>
                   )}
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Monthly totals */}
-          <div className="card">
-            <div className="card-title">Итого за месяц</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Смен</span>
-                <span style={{ fontWeight: 600 }}>{stats.days.length}</span>
+                {comments.length > 0 && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                    {comments.map((c, i) => <div key={i}>💬 {c}</div>)}
+                  </div>
+                )}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Часов</span>
-                <span style={{ fontWeight: 600 }}>{stats.total_hours.toFixed(1)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Заработано</span>
-                <span className="amount income" style={{ fontWeight: 600 }}>{stats.total_income.toFixed(2)} BYN</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>ЗП по ставке</span>
-                <span style={{ fontWeight: 600 }}>{(stats.total_hours * stats.base_hourly_rate).toFixed(2)} BYN</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Реальная ставка</span>
-                <span style={{ fontWeight: 600 }}>{avgPerHour} BYN/ч</span>
-              </div>
-            </div>
-          </div>
-        </>
+            );
+          })}
+        </div>
       )}
     </div>
   );
