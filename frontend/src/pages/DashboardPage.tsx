@@ -98,7 +98,7 @@ export default function DashboardPage() {
           <div className="card-title">Доходы</div>
           <div className="stat-value amount income">{formatMoney(summary.total_income)}</div>
         </div>
-        <div className="card" style={{ cursor: 'pointer' }} onClick={() => navigate('/report')}>
+        <div className="card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/expenses?month=${month}&year=${year}`)}>
           <div className="card-title">Расходы</div>
           <div className="stat-value amount expense">{formatMoney(summary.total_expense)}</div>
         </div>
@@ -183,8 +183,8 @@ export default function DashboardPage() {
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => navigate('/income')}>
           💰 Доходы
         </button>
-        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => navigate('/report')}>
-          📋 Отчёт
+        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => navigate(`/expenses?month=${month}&year=${year}`)}>
+          📋 Расходы
         </button>
       </div>
 
