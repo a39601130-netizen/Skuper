@@ -52,7 +52,8 @@ export default function IncomeStatsPage() {
   );
   if (!stats) return <div className="page"><div className="empty"><div className="empty-icon">📊</div>Нет данных</div></div>;
 
-  const avgPerHour = stats.total_hours > 0 ? (stats.total_income / stats.total_hours).toFixed(2) : '—';
+  const totalBasePay = stats.total_hours * stats.base_hourly_rate;
+  const avgPerHour = stats.total_hours > 0 ? ((stats.total_income + totalBasePay) / stats.total_hours).toFixed(2) : '—';
 
   return (
     <div className="page">
@@ -112,7 +113,7 @@ export default function IncomeStatsPage() {
         <div className="card" style={{ padding: 0 }}>
           {stats.days.map((day) => {
             const basePay = day.hours > 0 ? day.hours * stats.base_hourly_rate : 0;
-            const realRate = day.hours > 0 ? (day.total / day.hours).toFixed(2) : null;
+            const realRate = day.hours > 0 ? ((day.total + basePay) / day.hours).toFixed(2) : null;
             const comments = day.transactions.filter(t => t.comment).map(t => t.comment);
             return (
               <div className="list-item" key={day.day} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
