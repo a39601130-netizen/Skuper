@@ -98,6 +98,12 @@ from bot.handlers.reports import (
 # Handlers - Debug
 from bot.handlers.debug_commands import bugs_command, clear_bugs_command, sync_balances_command
 
+# Handlers - Backup
+from bot.handlers.backup import (
+    backup_command, backup_menu_callback,
+    backup_type_callback, backup_month_callback
+)
+
 # Handlers - Workout
 from bot.handlers.workout.session import (
     workout_menu_callback,
@@ -238,12 +244,16 @@ async def menu_callback(update: Update, context):
 
         # === МОДУЛЬ НАСТРОЙКИ ===
         elif data == "module_settings":
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            settings_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💾 Бэкап в Google Sheets", callback_data="backup_menu")],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data="menu_main")]
+            ])
             await query.edit_message_text(
                 "⚙️ **НАСТРОЙКИ**\n\n"
-                "В разработке...\n\n"
-                "Настройки можно изменить в Google Sheets.",
+                "Выбери действие:",
                 parse_mode="Markdown",
-                reply_markup=get_main_menu()
+                reply_markup=settings_kb
             )
 
         # === СТАРЫЕ MENU_ ПУТИ (совместимость) ===
@@ -260,10 +270,15 @@ async def menu_callback(update: Update, context):
         elif data == "menu_history":
             await history_callback(update, context)
         elif data == "menu_settings":
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            settings_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💾 Бэкап в Google Sheets", callback_data="backup_menu")],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data="menu_main")]
+            ])
             await query.edit_message_text(
-                "⚙️ **Настройки**\n\nВ разработке...",
+                "⚙️ **НАСТРОЙКИ**\n\nВыбери действие:",
                 parse_mode="Markdown",
-                reply_markup=get_main_menu()
+                reply_markup=settings_kb
             )
 
     except BadRequest as e:
@@ -469,6 +484,9 @@ def main():
     # Команды отладки
     application.add_handler(CommandHandler("bugs", bugs_command))
     application.add_handler(CommandHandler("clear_bugs", clear_bugs_command))
+
+    # Бэкап в Google Sheets
+    application.add_handler(CommandHandler("backup", backup_command))
 
     # ============================================
     # CONVERSATION HANDLER - ФИНАНСЫ
@@ -677,6 +695,11 @@ def main():
     application.add_handler(CallbackQueryHandler(advisor_refresh_callback, pattern="^advisor_refresh$"))
     application.add_handler(CallbackQueryHandler(delete_transaction_callback, pattern="^delete_"))
 
+    # Бэкап (до menu_callback, т.к. backup_menu перехватывается раньше module_)
+    application.add_handler(CallbackQueryHandler(backup_menu_callback, pattern="^backup_menu$"))
+    application.add_handler(CallbackQueryHandler(backup_type_callback, pattern="^backup_type_"))
+    application.add_handler(CallbackQueryHandler(backup_month_callback, pattern="^backup_month_"))
+
     # Главное меню и модули
     application.add_handler(CallbackQueryHandler(menu_callback, pattern="^(menu_|module_|finance_|advisor_)"))
 
@@ -745,6 +768,7 @@ def _register_handlers(application):
     application.add_handler(CommandHandler("bugs", bugs_command))
     application.add_handler(CommandHandler("clear_bugs", clear_bugs_command))
     application.add_handler(CommandHandler("sync_balances", sync_balances_command))
+    application.add_handler(CommandHandler("backup", backup_command))
 
     add_conv_handler = ConversationHandler(
         entry_points=[
@@ -880,6 +904,12 @@ def _register_handlers(application):
 
     application.add_handler(CallbackQueryHandler(advisor_refresh_callback, pattern="^advisor_refresh$"))
     application.add_handler(CallbackQueryHandler(delete_transaction_callback, pattern="^delete_"))
+
+    # Бэкап
+    application.add_handler(CallbackQueryHandler(backup_menu_callback, pattern="^backup_menu$"))
+    application.add_handler(CallbackQueryHandler(backup_type_callback, pattern="^backup_type_"))
+    application.add_handler(CallbackQueryHandler(backup_month_callback, pattern="^backup_month_"))
+
     application.add_handler(CallbackQueryHandler(menu_callback, pattern="^(menu_|module_|finance_|advisor_)"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=1)
     application.add_error_handler(error_handler)

@@ -103,6 +103,7 @@ bot/
     advisor.py                   — /advisor — AI советник
     reports.py                   — /report — еженедельный отчёт
     debug_commands.py            — /bugs, /clear_bugs, /sync_balances
+    backup.py                    — /backup — бэкап PG → Google Sheets (inline меню)
     workout/
       session.py                 — /workout — сессия тренировки
       exercises.py               — Логика упражнений, подходов, RPE
@@ -113,8 +114,9 @@ bot/
     workout_kb.py                — Клавиатуры тренировок
 
 services/
-  sheets.py                      — GoogleSheetsService (legacy, для бэкапа)
-  workout_sheets.py              — WorkoutSheetsService (legacy, для бэкапа)
+  sheets.py                      — GoogleSheetsService + BaseSheetsService (Google Sheets API)
+  workout_sheets.py              — WorkoutSheetsService (тренировки в Sheets)
+  backup.py                      — BackupService: экспорт PG → Google Sheets (финансы, тренировки, веса)
   ai_advisor.py                  — AIAdvisor (DeepSeek API)
 
 utils/
@@ -169,6 +171,7 @@ Telegram Mini App присылает `X-Telegram-Init-Data` заголовок.
 | /weights | current_weights_command | workout/progress.py |
 | /progress | progress_command | workout/progress.py |
 | /sync_balances | sync_balances_command | debug_commands.py |
+| /backup | backup_command | backup.py |
 
 ## Деплой (Docker Compose)
 - Сервер: VPS (193.106.251.72), `ssh bot`, `~/Artur/Skuper`
