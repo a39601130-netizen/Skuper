@@ -128,6 +128,7 @@ export interface Exercise {
   current_weight?: number;
   target_reps?: string;
   status?: string;
+  notes?: string;
 }
 
 export interface WorkoutHistory {

@@ -148,7 +148,7 @@ HUMAN_DESIGN_CONTEXT = """
 # ТРЕНИРОВКИ - КОНСТАНТЫ
 # ============================================
 WORKOUT_PHASES = {
-    "intro": {"name": "Знакомство", "weeks": "1-2", "rpe_min": 5, "rpe_max": 6, "sets_modifier": 0.5},
+    "intro": {"name": "Повторное знакомство", "weeks": "1-2", "rpe_min": 5, "rpe_max": 6, "sets_modifier": 0.6},
     "base": {"name": "Построение базы", "weeks": "3-4", "rpe_min": 6, "rpe_max": 7, "sets_modifier": 1.0},
     "develop": {"name": "Развитие", "weeks": "5-8", "rpe_min": 7, "rpe_max": 8, "sets_modifier": 1.0},
     "deload": {"name": "Разгрузка", "weeks": "9", "rpe_min": 6, "rpe_max": 7, "sets_modifier": 0.5},

@@ -27,32 +27,23 @@ logger = logging.getLogger(__name__)
 
 WARMUP_PHASES = {
     1: {
-        'name': 'Фаза 1: Кардио',
+        'name': 'Фаза 1: Общая активация',
         'description': '🔥 Быстрая ходьба или велотренажёр **3 минуты**',
         'key': 'phase1_cardio'
     },
     2: {
-        'name': 'Фаза 2: McGill Big 3',
-        'description': """🧘 **Стабилизация позвоночника:**
+        'name': 'Фаза 2: Подготовка к движению',
+        'description': """🏋️ **Активация (3 мин):**
 
-1️⃣ Скручивание Макгилла (8-6-4, удержание 8 сек)
-2️⃣ Боковая планка (8-6-4 на каждую сторону)
-3️⃣ Птица-собака (8-6-4 на каждую сторону)""",
-        'key': 'phase2_mcgill'
+• Присед без веса: 10 повторов (пауза 3 сек внизу)
+• Кошка-корова: 10 медленных циклов
+• Ягодичный мостик без веса: 15 повторов (удержание 2 сек)""",
+        'key': 'phase2_movement'
     },
     3: {
-        'name': 'Фаза 3: Подготовка к движению',
-        'description': """🏋️ **Активация:**
-
-• Гоблет-присед без веса: 10 повторов (пауза 3 сек внизу)
-• Кошка-корова: 10 медленных циклов
-• Ягодичный мостик: 15 повторов (удержание 2 сек)""",
-        'key': 'phase3_movement'
-    },
-    4: {
-        'name': 'Фаза 4: Специфическая',
-        'description': '🎯 1 подход каждого упражнения с **50% рабочего веса**',
-        'key': 'phase4_specific'
+        'name': 'Фаза 3: Специфическая',
+        'description': '🎯 1 подход каждого упражнения с **50% рабочего веса** (2 мин)',
+        'key': 'phase3_specific'
     }
 }
 
@@ -107,7 +98,7 @@ async def warmup_done_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data['workout']['warmup_phases'][phase_key] = True
     
     # Переходим к следующей фазе или к упражнениям
-    if phase < 4:
+    if phase < 3:
         return await _show_warmup_phase(update, context, phase + 1)
     else:
         return await _warmup_complete(update, context)
@@ -125,8 +116,8 @@ async def warmup_skip_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         phase = int(parts[-1])
     except (ValueError, IndexError):
         return
-    
-    if phase < 4:
+
+    if phase < 3:
         return await _show_warmup_phase(update, context, phase + 1)
     else:
         return await _warmup_complete(update, context)
@@ -141,7 +132,7 @@ async def _warmup_complete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     text = f"""✅ **Разминка завершена!**
 
-Выполнено фаз: {done_count}/4
+Выполнено фаз: {done_count}/3
 
 Готов к основной части?
 """

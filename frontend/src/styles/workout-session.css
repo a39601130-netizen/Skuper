@@ -246,6 +246,19 @@
   margin-bottom: 4px;
 }
 
+.ws-ex-notes {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.4;
+}
+.ws-notes-icon {
+  flex-shrink: 0;
+}
+
 .ws-ex-info {
   padding: 12px;
 }

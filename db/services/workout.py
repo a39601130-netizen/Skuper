@@ -302,6 +302,7 @@ def _exercise_to_dict(e: Exercise) -> Dict:
         "reps_max": e.reps_max,
         "rest_seconds": e.rest_seconds,
         "default_sets": e.default_sets,
+        "notes": e.notes or "",
     }
 
 

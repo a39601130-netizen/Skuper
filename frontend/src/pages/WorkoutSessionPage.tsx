@@ -28,22 +28,17 @@ interface SetEntry {
 
 const WARMUP_PHASES = [
   {
-    id: 1, title: 'Кардио',
-    desc: '3 минуты быстрой ходьбы или велотренажера',
+    id: 1, title: 'Общая активация',
+    desc: 'Быстрая ходьба или велотренажёр — 3 минуты',
     icon: '🫀',
   },
   {
-    id: 2, title: 'McGill Big 3',
-    desc: 'Скручивание Макгилла (8-6-4), Боковая планка (8-6-4), Птица-собака (8-6-4)',
-    icon: '🦴',
-  },
-  {
-    id: 3, title: 'Подготовка к движению',
-    desc: 'Гоблет-присед 10x, Кошка-корова 10x, Ягодичный мостик 15x',
+    id: 2, title: 'Подготовка к движению',
+    desc: 'Присед без веса 10x (пауза 3 сек), Кошка-корова 10x, Ягодичный мостик 15x',
     icon: '🔄',
   },
   {
-    id: 4, title: 'Специфическая разминка',
+    id: 3, title: 'Специфическая разминка',
     desc: '1 подход каждого упражнения с 50% рабочего веса',
     icon: '🎯',
   },
@@ -82,7 +77,7 @@ export default function WorkoutSessionPage() {
   const [preStep, setPreStep] = useState(0); // 0-4
 
   // Warmup
-  const [warmupDone, setWarmupDone] = useState<boolean[]>([false, false, false, false]);
+  const [warmupDone, setWarmupDone] = useState<boolean[]>([false, false, false]);
 
   // Exercise
   const [exIdx, setExIdx] = useState(0);
@@ -117,7 +112,7 @@ export default function WorkoutSessionPage() {
       setExIdx((saved.exIdx as number) || 0);
       setSetNum((saved.setNum as number) || 1);
       setSetsLog((saved.setsLog as Record<string, SetEntry[]>) || {});
-      setWarmupDone((saved.warmupDone as boolean[]) || [false, false, false, false]);
+      setWarmupDone((saved.warmupDone as boolean[]) || [false, false, false]);
       setStage('exercise');
       return;
     }
@@ -561,7 +556,7 @@ export default function WorkoutSessionPage() {
         <div className="ws-stage">
           <div className="ws-header">
             <h2>Разминка</h2>
-            <p className="ws-meta">{warmupDone.filter(Boolean).length}/4 фаз выполнено</p>
+            <p className="ws-meta">{warmupDone.filter(Boolean).length}/3 фаз выполнено</p>
           </div>
 
           {WARMUP_PHASES.map((phase, i) => (
@@ -601,6 +596,13 @@ export default function WorkoutSessionPage() {
             <h2>{currentEx.name}</h2>
             <p className="ws-meta">{currentEx.category}</p>
           </div>
+
+          {/* Technical notes */}
+          {currentEx.notes && (
+            <div className="ws-card ws-ex-notes">
+              <span className="ws-notes-icon">💡</span> {currentEx.notes}
+            </div>
+          )}
 
           {/* Exercise info card */}
           <div className="ws-card ws-ex-info">

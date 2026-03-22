@@ -87,8 +87,15 @@ async def workout_start_callback(update: Update, context: ContextTypes.DEFAULT_T
     day_emoji = "🔵" if next_day == "A" else "🟢"
     day_name = "Горизонтальный акцент" if next_day == "A" else "Вертикальный акцент"
     
-    # Список упражнений
-    ex_list = "\n".join([f"  {i+1}. {e['name_short']}" for i, e in enumerate(exercises)])
+    # Список упражнений с подсказками техники
+    ex_lines = []
+    for i, e in enumerate(exercises):
+        line = f"  {i+1}. {e.get('name_short', e.get('name', ''))}"
+        notes = e.get('notes', '')
+        if notes:
+            line += f"\n      _💡 {notes}_"
+        ex_lines.append(line)
+    ex_list = "\n".join(ex_lines)
     
     # Целевой RPE для фазы
     phase_config = config.WORKOUT_PHASES.get(week_phase['phase'], {})
@@ -424,7 +431,7 @@ async def energy_after_callback(update: Update, context: ContextTypes.DEFAULT_TY
         workout_id=workout_data['workout_id'],
         energy_after=energy_after,
         warmup_done=bool(workout_data.get('warmup_phases')),
-        mcgill_done=workout_data.get('warmup_phases', {}).get('phase2_mcgill_curl', False),
+        mcgill_done=False,  # McGill Big 3 делается утром отдельно
         notes=""
     )
     

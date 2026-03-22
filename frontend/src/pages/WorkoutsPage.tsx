@@ -82,7 +82,7 @@ export default function WorkoutsPage() {
 
           <div className="card" style={{ padding: 0 }}>
             {next.exercises.map((ex) => (
-              <div className="list-item" key={ex.exercise_id}>
+              <div className="list-item" key={ex.exercise_id} style={{ flexWrap: 'wrap' }}>
                 <span className="list-item-icon">🏋️</span>
                 <div className="list-item-content">
                   <div className="list-item-title">{ex.name}</div>
@@ -92,6 +92,11 @@ export default function WorkoutsPage() {
                   <div className="amount">{ex.current_weight || 0} кг</div>
                   <div className="stat-label">{ex.target_reps || ''}</div>
                 </div>
+                {ex.notes && (
+                  <div style={{ width: '100%', padding: '4px 0 2px 36px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                    💡 {ex.notes}
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -46,7 +46,7 @@ INITIAL_CATEGORIES = [
 ]
 
 INITIAL_PHASES = [
-    {"name": "Знакомство",       "weeks": "1-2", "rpe_min": 5, "rpe_max": 6, "sets_modifier": 0.5, "sort_order": 1},
+    {"name": "Повторное знакомство", "weeks": "1-2", "rpe_min": 5, "rpe_max": 6, "sets_modifier": 0.6, "sort_order": 1},
     {"name": "Построение базы",  "weeks": "3-4", "rpe_min": 6, "rpe_max": 7, "sets_modifier": 1.0, "sort_order": 2},
     {"name": "Развитие",         "weeks": "5-8", "rpe_min": 7, "rpe_max": 8, "sets_modifier": 1.0, "sort_order": 3},
     {"name": "Разгрузка",        "weeks": "9",   "rpe_min": 6, "rpe_max": 7, "sets_modifier": 0.5, "sort_order": 4},
@@ -54,28 +54,44 @@ INITIAL_PHASES = [
 
 
 INITIAL_EXERCISES = [
-    # День A — Верх (жим)
-    {"exercise_id": "bench_press", "name": "Жим лёжа", "day": "A", "order": 1,
-     "category": "Грудь", "weight_step": 2.5, "reps_min": 6, "reps_max": 10, "rest_seconds": 150, "default_sets": 3},
-    {"exercise_id": "ohp", "name": "Жим стоя", "day": "A", "order": 2,
-     "category": "Плечи", "weight_step": 2.5, "reps_min": 6, "reps_max": 10, "rest_seconds": 150, "default_sets": 3},
-    {"exercise_id": "incline_db_press", "name": "Жим гантелей на наклонной", "day": "A", "order": 3,
-     "category": "Грудь", "weight_step": 2.0, "reps_min": 8, "reps_max": 12, "rest_seconds": 90, "default_sets": 3},
-    {"exercise_id": "lateral_raise", "name": "Махи в стороны", "day": "A", "order": 4,
-     "category": "Плечи", "weight_step": 1.0, "reps_min": 12, "reps_max": 15, "rest_seconds": 60, "default_sets": 3},
-    {"exercise_id": "tricep_pushdown", "name": "Разгибания на трицепс", "day": "A", "order": 5,
-     "category": "Руки", "weight_step": 2.5, "reps_min": 10, "reps_max": 15, "rest_seconds": 60, "default_sets": 3},
-    # День B — Верх (тяга) + Ноги
-    {"exercise_id": "squat", "name": "Приседания", "day": "B", "order": 1,
-     "category": "Ноги", "weight_step": 2.5, "reps_min": 6, "reps_max": 10, "rest_seconds": 150, "default_sets": 3},
-    {"exercise_id": "barbell_row", "name": "Тяга штанги в наклоне", "day": "B", "order": 2,
-     "category": "Спина", "weight_step": 2.5, "reps_min": 6, "reps_max": 10, "rest_seconds": 150, "default_sets": 3},
-    {"exercise_id": "pulldown", "name": "Тяга верхнего блока", "day": "B", "order": 3,
-     "category": "Спина", "weight_step": 2.5, "reps_min": 8, "reps_max": 12, "rest_seconds": 90, "default_sets": 3},
-    {"exercise_id": "leg_curl", "name": "Сгибания ног", "day": "B", "order": 4,
-     "category": "Ноги", "weight_step": 2.5, "reps_min": 10, "reps_max": 15, "rest_seconds": 60, "default_sets": 3},
-    {"exercise_id": "bicep_curl", "name": "Сгибания на бицепс", "day": "B", "order": 5,
-     "category": "Руки", "weight_step": 1.0, "reps_min": 10, "reps_max": 15, "rest_seconds": 60, "default_sets": 3},
+    # День A — Горизонтальный акцент (Становая + Жим + Горизонтальная тяга)
+    {"exercise_id": "deadlift", "name": "Становая тяга", "day": "A", "order": 1,
+     "category": "Спина", "weight_step": 2.5, "reps_min": 5, "reps_max": 8, "rest_seconds": 150, "default_sets": 3,
+     "notes": "Гриф вдоль тела. Нейтральная спина. Оттолкни пол ногами."},
+    {"exercise_id": "bench_press", "name": "Жим лёжа", "day": "A", "order": 2,
+     "category": "Грудь", "weight_step": 2.5, "reps_min": 6, "reps_max": 8, "rest_seconds": 150, "default_sets": 4,
+     "notes": "Лопатки сведены и опущены. Локти ~45°. Гриф касается груди без отбива."},
+    {"exercise_id": "seated_cable_row", "name": "Тяга блока к поясу", "day": "A", "order": 3,
+     "category": "Спина", "weight_step": 2.5, "reps_min": 10, "reps_max": 12, "rest_seconds": 90, "default_sets": 3,
+     "notes": "Тяни локти к карманам. Сведи лопатки. Контролируй негатив 2-3 сек."},
+    {"exercise_id": "rdl_db", "name": "Румынская тяга (гантели)", "day": "A", "order": 4,
+     "category": "Ноги", "weight_step": 2.0, "reps_min": 10, "reps_max": 12, "rest_seconds": 90, "default_sets": 2,
+     "notes": "Колени слегка согнуты и зафиксированы. Таз назад. Спина нейтральная."},
+    {"exercise_id": "face_pull", "name": "Фейс-пулл", "day": "A", "order": 5,
+     "category": "Плечи", "weight_step": 1.0, "reps_min": 15, "reps_max": 20, "rest_seconds": 60, "default_sets": 2,
+     "notes": "Для здоровья плеч — не гонись за весом. Финиш: поза 'двойной бицепс'."},
+    {"exercise_id": "tricep_pushdown", "name": "Разгибание на трицепс", "day": "A", "order": 6,
+     "category": "Руки", "weight_step": 1.0, "reps_min": 12, "reps_max": 15, "rest_seconds": 60, "default_sets": 2,
+     "notes": "Локти прижаты к корпусу. Полное разгибание внизу."},
+    # День B — Вертикальный акцент (Ягодицы + Жим над головой + Вертикальная тяга)
+    {"exercise_id": "hip_thrust", "name": "Ягодичный мост (штанга)", "day": "B", "order": 1,
+     "category": "Ноги", "weight_step": 2.5, "reps_min": 8, "reps_max": 12, "rest_seconds": 120, "default_sets": 3,
+     "notes": "Подбородок к груди. Пауза 1-2 сек вверху. Давление через пятки."},
+    {"exercise_id": "ohp", "name": "Жим над головой", "day": "B", "order": 2,
+     "category": "Плечи", "weight_step": 2.5, "reps_min": 6, "reps_max": 8, "rest_seconds": 120, "default_sets": 3,
+     "notes": "Кор и ягодицы напряжены. Не отклоняй корпус назад. Гриф вверх, не вперёд."},
+    {"exercise_id": "lat_pulldown", "name": "Тяга верхнего блока", "day": "B", "order": 3,
+     "category": "Спина", "weight_step": 2.5, "reps_min": 8, "reps_max": 10, "rest_seconds": 90, "default_sets": 3,
+     "notes": "Тяни к верхней части груди. Полная амплитуда. Контролируй негатив."},
+    {"exercise_id": "leg_press", "name": "Жим ногами", "day": "B", "order": 4,
+     "category": "Ноги", "weight_step": 5.0, "reps_min": 12, "reps_max": 15, "rest_seconds": 90, "default_sets": 2,
+     "notes": "Поясница прижата к спинке ВСЕГДА. Не разгибай колени до конца."},
+    {"exercise_id": "lateral_raise", "name": "Разведение гантелей в стороны", "day": "B", "order": 5,
+     "category": "Плечи", "weight_step": 1.0, "reps_min": 12, "reps_max": 15, "rest_seconds": 60, "default_sets": 2,
+     "notes": "Веди локтями. Не выше плеч. Мизинцы чуть выше больших пальцев."},
+    {"exercise_id": "bicep_curl", "name": "Сгибание на бицепс (гантели)", "day": "B", "order": 6,
+     "category": "Руки", "weight_step": 1.0, "reps_min": 12, "reps_max": 15, "rest_seconds": 60, "default_sets": 2,
+     "notes": "Локти прижаты и неподвижны. Полная амплитуда. Негатив 2-3 сек."},
 ]
 
 

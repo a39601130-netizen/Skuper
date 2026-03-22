@@ -34,11 +34,10 @@ class WorkoutStates(IntEnum):
     BACK_PAIN = auto()          # Боль в спине
     EMOTIONAL_WAVE = auto()     # Эмоциональная волна
 
-    # Разминка
-    WARMUP_PHASE1 = auto()      # Кардио
-    WARMUP_PHASE2 = auto()      # McGill Big 3
-    WARMUP_PHASE3 = auto()      # Подготовка к движению
-    WARMUP_PHASE4 = auto()      # Специфическая
+    # Разминка (3 фазы — McGill Big 3 делается утром отдельно)
+    WARMUP_PHASE1 = auto()      # Общая активация (кардио)
+    WARMUP_PHASE2 = auto()      # Подготовка к движению
+    WARMUP_PHASE3 = auto()      # Специфическая разминка
 
     # Основная часть
     EXERCISE_START = auto()     # Показ упражнения

@@ -100,6 +100,7 @@ class Exercise(Base):
     reps_max: Mapped[int] = mapped_column(Integer, default=12)
     rest_seconds: Mapped[int] = mapped_column(Integer, default=90)
     default_sets: Mapped[int] = mapped_column(Integer, default=3)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     current_weight: Mapped[Optional["CurrentWeight"]] = relationship(

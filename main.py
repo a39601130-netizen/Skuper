@@ -618,10 +618,6 @@ def main():
                 CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
                 CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
             ],
-            WorkoutStates.WARMUP_PHASE4: [
-                CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
-                CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
-            ],
             WorkoutStates.EXERCISE_START: [
                 CallbackQueryHandler(warmup_complete_callback, pattern="^warmup_complete$"),
             ],
@@ -858,10 +854,6 @@ def _register_handlers(application):
                 CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
             ],
             WorkoutStates.WARMUP_PHASE3: [
-                CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
-                CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
-            ],
-            WorkoutStates.WARMUP_PHASE4: [
                 CallbackQueryHandler(warmup_done_callback, pattern="^warmup_done_"),
                 CallbackQueryHandler(warmup_skip_callback, pattern="^warmup_skip_"),
             ],
