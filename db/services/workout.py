@@ -2,6 +2,8 @@
 
 import logging
 from datetime import date, timedelta
+
+from utils.timezone import today_minsk
 from typing import Optional, List, Dict, Any
 
 from sqlalchemy import select, desc
@@ -162,7 +164,7 @@ async def get_current_week_and_phase(db: AsyncSession) -> Dict:
             "rpe_max": phase.rpe_max if phase else 6,
         }
 
-    weeks_elapsed = (date.today() - first.date).days // 7 + 1
+    weeks_elapsed = (today_minsk() - first.date).days // 7 + 1
 
     # Определяем фазу по неделям
     phase_result = await db.execute(select(Phase).order_by(Phase.sort_order))
@@ -326,7 +328,7 @@ async def create_workout(
 ) -> Dict:
     """Создать новую тренировку."""
     workout = Workout(
-        date=date.today(),
+        date=today_minsk(),
         day_type=day_type,
         week=week,
         phase=phase,

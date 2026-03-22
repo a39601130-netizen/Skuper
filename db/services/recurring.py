@@ -2,6 +2,8 @@
 
 import calendar
 from datetime import date, timedelta
+
+from utils.timezone import today_minsk
 from typing import Optional, List, Dict, Any
 
 from sqlalchemy import select
@@ -91,7 +93,7 @@ async def apply_recurring_transaction(db: AsyncSession, rt_id: int) -> Optional[
 
     tx = await add_transaction(
         db,
-        trans_date=date.today(),
+        trans_date=today_minsk(),
         trans_type=rt.type,
         account_name=rt.account.name,
         amount=rt.amount,

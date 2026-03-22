@@ -3,7 +3,7 @@ Handler для бэкапа данных в Google Sheets
 Flow: Настройки → 💾 Бэкап → Тип (Финансы/Тренировки/Всё) → Месяц → Экспорт
 """
 import logging
-from datetime import datetime
+from utils.timezone import now_minsk
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -31,7 +31,7 @@ def get_backup_menu() -> InlineKeyboardMarkup:
 
 def get_backup_month_keyboard(backup_type: str) -> InlineKeyboardMarkup:
     """Клавиатура выбора месяца (текущий + 2 предыдущих)"""
-    now = datetime.now()
+    now = now_minsk()
     buttons = []
 
     for i in range(3):

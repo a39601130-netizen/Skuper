@@ -3,6 +3,8 @@
 import calendar
 import logging
 from datetime import date, datetime
+
+from utils.timezone import today_minsk
 from typing import Optional, List, Dict, Any
 
 from sqlalchemy import select, func, and_, extract, update
@@ -204,7 +206,7 @@ async def get_category_spending(
     year: Optional[int] = None,
 ) -> Dict[str, float]:
     """Расходы по категориям за месяц. Возвращает {category_name: amount}."""
-    today = date.today()
+    today = today_minsk()
     m = month or today.month
     y = year or today.year
     first_day, last_day = _month_date_range(m, y)
@@ -231,7 +233,7 @@ async def get_daily_spending(
     year: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Расходы по дням за месяц. Возвращает [{date, amount}]."""
-    today = date.today()
+    today = today_minsk()
     m = month or today.month
     y = year or today.year
     first_day, last_day = _month_date_range(m, y)
@@ -257,7 +259,7 @@ async def get_monthly_summary(
     year: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Месячная сводка: доходы, расходы, балансы, категории."""
-    today = date.today()
+    today = today_minsk()
     month = month or today.month
     year = year or today.year
 
@@ -356,7 +358,7 @@ async def get_income_by_days(
     year: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Доходы по дням с детализацией."""
-    today = date.today()
+    today = today_minsk()
     month = month or today.month
     year = year or today.year
 
@@ -421,7 +423,7 @@ async def get_income_by_days(
 
 async def get_weekly_summary(db: AsyncSession, days_back: int = 7) -> Dict[str, Any]:
     from datetime import timedelta
-    today = date.today()
+    today = today_minsk()
     from_date = today - timedelta(days=days_back)
 
     result = await db.execute(

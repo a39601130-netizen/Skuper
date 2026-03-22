@@ -3,6 +3,8 @@
 import asyncio
 import logging
 from datetime import date
+
+from utils.timezone import today_minsk
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -79,7 +81,7 @@ class TransactionCreate(BaseModel):
     @field_validator("date")
     @classmethod
     def date_not_future(cls, v: Optional[date]) -> Optional[date]:
-        if v and v > date.today():
+        if v and v > today_minsk():
             raise ValueError("Дата не может быть в будущем")
         return v
 
@@ -108,7 +110,7 @@ async def create_transaction(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    tx_date = data.date or date.today()
+    tx_date = data.date or today_minsk()
     try:
         tx = await add_transaction(
             db,

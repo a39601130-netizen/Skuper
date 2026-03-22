@@ -3,6 +3,7 @@
 """
 import logging
 from datetime import datetime
+from utils.timezone import now_minsk
 from typing import Dict, Any, List, Optional
 import re
 import config
@@ -179,7 +180,7 @@ def format_transaction_success(
         earned = hours * config.BASE_HOURLY_RATE
         lines.append(f"⏰ Часы: {hours} (= {format_money(earned)} по ставке)")
 
-    lines.append(f"📅 {datetime.now().strftime('%d.%m.%Y')}")
+    lines.append(f"📅 {now_minsk().strftime('%d.%m.%Y')}")
 
     # Показываем баланс и остаток по категории
     if show_balance:
@@ -450,8 +451,8 @@ def format_income_by_days(data: Dict[str, Any]) -> str:
 
     by_day = data["by_day"]
     sorted_days = data["sorted_days"]
-    month = data.get("month", datetime.now().month)
-    year = data.get("year", datetime.now().year)
+    month = data.get("month", now_minsk().month)
+    year = data.get("year", now_minsk().year)
 
     # Названия дней недели
     weekday_names = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]

@@ -7,9 +7,10 @@ import config
 # === ВЫБОР ДАТЫ ===
 def get_date_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура выбора даты"""
-    from datetime import datetime, timedelta
-    
-    today = datetime.now()
+    from datetime import timedelta
+    from utils.timezone import now_minsk
+
+    today = now_minsk()
     yesterday = today - timedelta(days=1)
     day_before = today - timedelta(days=2)
     

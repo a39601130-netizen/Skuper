@@ -4,6 +4,7 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+from utils.timezone import now_minsk
 from typing import Optional, Dict, List, Any
 from functools import wraps
 import time
@@ -341,8 +342,8 @@ class GoogleSheetsService:
         data = sheet.get_all_values()
         
         # Настройки в первой строке: C1 = месяц, E1 = год
-        month = safe_int(data[0][2], datetime.now().month)
-        year = safe_int(data[0][4], datetime.now().year)
+        month = safe_int(data[0][2], now_minsk().month)
+        year = safe_int(data[0][4], now_minsk().year)
         
         return {"month": month, "year": year}
     
@@ -750,7 +751,7 @@ class GoogleSheetsService:
         data = sheet.get_all_values()
 
         # Определяем диапазон дней
-        today = datetime.now().day
+        today = now_minsk().day
         # Вычисляем начало недели (days_back дней назад)
         # Примечание: таблица содержит данные только за текущий месяц,
         # поэтому в начале месяца отчёт будет неполным (только дни текущего месяца)

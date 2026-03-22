@@ -7,6 +7,7 @@ from logging.handlers import RotatingFileHandler
 import json
 import traceback
 from datetime import datetime
+from utils.timezone import now_minsk
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -69,7 +70,7 @@ class BugTracker:
                     safe_context[key] = str(value)
 
         bug_entry = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_minsk().isoformat(),
             "error_type": type(error).__name__,
             "error_message": str(error),
             "traceback": traceback.format_exc(),
@@ -108,7 +109,7 @@ class BugTracker:
         """Отметить баг как решенный"""
         if 0 <= index < len(self.bugs):
             self.bugs[index]["resolved"] = True
-            self.bugs[index]["resolved_at"] = datetime.now().isoformat()
+            self.bugs[index]["resolved_at"] = now_minsk().isoformat()
             self._save_bugs()
 
     def clear_resolved(self):

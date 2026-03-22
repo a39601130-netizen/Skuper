@@ -4,6 +4,7 @@ Google Sheets - Сервис тренировок
 """
 import logging
 from datetime import datetime
+from utils.timezone import now_minsk
 from typing import List, Dict, Any, Optional
 
 import config
@@ -103,7 +104,7 @@ class WorkoutSheetsService(BaseSheetsService):
             # Формируем batch update для всех изменений за раз
             updates = [
                 {'range': f'C{row_num}', 'value': new_weight},  # Вес
-                {'range': f'M{row_num}', 'value': datetime.now().strftime('%Y-%m-%d')}  # Дата
+                {'range': f'M{row_num}', 'value': now_minsk().strftime('%Y-%m-%d')}  # Дата
             ]
 
             # Добавляем последние подходы (F, G, H, I = 6, 7, 8, 9)
@@ -188,7 +189,7 @@ class WorkoutSheetsService(BaseSheetsService):
         Returns:
             workout_id (номер строки)
         """
-        now = datetime.now()
+        now = now_minsk()
         
         # Получаем следующий ID
         last_row = self.get_last_row_number(config.SHEET_WORKOUTS)
@@ -234,7 +235,7 @@ class WorkoutSheetsService(BaseSheetsService):
         sheet = self.get_sheet(config.SHEET_WORKOUTS)
         row_num = workout_id + 1  # +1 из-за заголовка
         
-        now = datetime.now()
+        now = now_minsk()
         
         # Обновляем поля
         updates = [
@@ -354,7 +355,7 @@ class WorkoutSheetsService(BaseSheetsService):
         Returns:
             set_id
         """
-        now = datetime.now()
+        now = now_minsk()
         
         # Получаем следующий ID
         last_row = self.get_last_row_number(config.SHEET_SETS)

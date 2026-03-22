@@ -121,6 +121,7 @@ services/
 
 utils/
   formatters.py                  — Форматирование сообщений, parse_quick_input()
+  timezone.py                    — now_minsk(), today_minsk() — всё время по Europe/Minsk
   telegram_helpers.py            — safe_edit_message()
   debug_logger.py                — Отладочное логирование
 

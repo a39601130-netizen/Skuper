@@ -263,8 +263,8 @@ class AIAdvisor:
     def _format_budget_context(self, data: dict) -> str:
         """Форматировать данные бюджета для AI"""
         import calendar
-        from datetime import datetime
-        today = datetime.now()
+        from utils.timezone import now_minsk
+        today = now_minsk()
         days_in_month = calendar.monthrange(today.year, today.month)[1]
         days_passed = today.day
         month_progress_pct = int(days_passed / days_in_month * 100) if days_in_month > 0 else 0

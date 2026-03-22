@@ -6,6 +6,7 @@ import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from datetime import datetime
+from utils.timezone import now_minsk, today_minsk
 from utils.debug_logger import bug_tracker, log_conversation_state
 from bot.keyboards.menus import (
     get_add_menu,
@@ -30,10 +31,9 @@ async def _save_to_pg(
 ):
     """Save a bot transaction to PostgreSQL in background."""
     try:
-        from datetime import date
         from db.database import async_session
         from db.services.finance import add_transaction
-        tx_date = date.today()
+        tx_date = today_minsk()
         if day:
             tx_date = tx_date.replace(day=int(day))
         async with async_session() as db:
@@ -139,7 +139,7 @@ async def handle_quick_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     try:
         sheets = get_sheets_service()
-        day = datetime.now().day
+        day = now_minsk().day
         
         success = sheets.add_transaction(
             day=day,
@@ -738,7 +738,7 @@ async def select_category_callback(update: Update, context: ContextTypes.DEFAULT
     # Если транзакция не инициализирована (вход через quick кнопку)
     if not trans.trans_type:
         trans.trans_type = "Расход"
-        trans.day = datetime.now().day
+        trans.day = now_minsk().day
 
     # Кнопка "Все категории"
     if data == "show_all_categories":
@@ -951,7 +951,7 @@ async def enter_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         trans.account = "Наличные"
     
     if not trans.day:
-        trans.day = datetime.now().day
+        trans.day = now_minsk().day
     
     logger.info(f"enter_comment: type={trans.trans_type}, category={trans.category}")
 
@@ -989,7 +989,7 @@ async def enter_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
         trans.account = "Наличные"
     
     if not trans.day:
-        trans.day = datetime.now().day
+        trans.day = now_minsk().day
     
     return await show_confirmation(update, context)
 
@@ -1031,7 +1031,7 @@ async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         try:
             sheets = get_sheets_service()
-            day = trans.day or datetime.now().day
+            day = trans.day or now_minsk().day
             account = trans.account or "Наличные"
             
             logger.info(f"Записываю: {trans.trans_type}, {account}, {trans.amount}")
