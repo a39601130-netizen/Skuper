@@ -64,9 +64,9 @@ INITIAL_EXERCISES = [
     {"exercise_id": "seated_cable_row", "name": "Тяга блока к поясу", "day": "A", "order": 3,
      "category": "Спина", "weight_step": 2.5, "reps_min": 10, "reps_max": 12, "rest_seconds": 90, "default_sets": 3,
      "notes": "Тяни локти к карманам. Сведи лопатки. Контролируй негатив 2-3 сек."},
-    {"exercise_id": "rdl_db", "name": "Румынская тяга (гантели)", "day": "A", "order": 4,
-     "category": "Ноги", "weight_step": 2.0, "reps_min": 10, "reps_max": 12, "rest_seconds": 90, "default_sets": 2,
-     "notes": "Колени слегка согнуты и зафиксированы. Таз назад. Спина нейтральная."},
+    {"exercise_id": "leg_extension", "name": "Разгибание ног в тренажёре", "day": "A", "order": 4,
+     "category": "Ноги", "weight_step": 2.0, "reps_min": 12, "reps_max": 15, "rest_seconds": 60, "default_sets": 2,
+     "notes": "Плавно, без рывка. Спина прижата. Пауза на секунду вверху. Носки на себя."},
     {"exercise_id": "face_pull", "name": "Фейс-пулл", "day": "A", "order": 5,
      "category": "Плечи", "weight_step": 1.0, "reps_min": 15, "reps_max": 20, "rest_seconds": 60, "default_sets": 2,
      "notes": "Для здоровья плеч — не гонись за весом. Финиш: поза 'двойной бицепс'."},
@@ -138,6 +138,7 @@ async def _seed_phases(session: AsyncSession):
 async def _seed_exercises(session: AsyncSession):
     result = await session.execute(select(Exercise).limit(1))
     if result.scalar_one_or_none():
+        await _sync_exercises(session)
         return
     for data in INITIAL_EXERCISES:
         session.add(Exercise(**data))
@@ -151,3 +152,41 @@ async def _seed_exercises(session: AsyncSession):
         )
         session.add(cw)
     logger.info(f"Seeded {len(INITIAL_EXERCISES)} exercises with current weights")
+
+
+async def _sync_exercises(session: AsyncSession):
+    """Sync exercises: add new, deactivate removed, update existing."""
+    result = await session.execute(select(Exercise))
+    db_exercises = {e.exercise_id: e for e in result.scalars().all()}
+    seed_ids = {d["exercise_id"] for d in INITIAL_EXERCISES}
+
+    for data in INITIAL_EXERCISES:
+        eid = data["exercise_id"]
+        if eid in db_exercises:
+            ex = db_exercises[eid]
+            changed = False
+            for field in ("name", "day", "order", "category", "weight_step",
+                          "reps_min", "reps_max", "rest_seconds", "default_sets", "notes"):
+                if getattr(ex, field) != data.get(field):
+                    setattr(ex, field, data[field])
+                    changed = True
+            if not ex.is_active:
+                ex.is_active = True
+                changed = True
+            if changed:
+                logger.info(f"Updated exercise: {eid}")
+        else:
+            session.add(Exercise(**data))
+            session.add(CurrentWeight(
+                exercise_id=eid,
+                weight=0.0,
+                target_reps=f"{data['reps_min']}-{data['reps_max']}",
+                status="in_progress",
+            ))
+            logger.info(f"Added new exercise: {eid}")
+
+    # Деактивировать упражнения, которых нет в seed
+    for eid, ex in db_exercises.items():
+        if eid not in seed_ids and ex.is_active:
+            ex.is_active = False
+            logger.info(f"Deactivated exercise: {eid}")
