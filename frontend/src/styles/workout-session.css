@@ -361,7 +361,7 @@
 
 /* Set input */
 .ws-set-input {
-  padding: 16px;
+  padding: 12px;
 }
 
 .ws-input-row {
@@ -378,23 +378,22 @@
 .ws-input-control {
   display: flex;
   align-items: center;
-  gap: 8px;
-  max-width: 100%;
-  overflow: hidden;
+  gap: 6px;
 }
 
 .ws-adj-btn {
-  width: 52px;
+  min-width: 48px;
   height: 48px;
   border-radius: 12px;
   border: 2px solid var(--border);
   background: var(--bg-card);
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s;
   flex-shrink: 0;
+  padding: 0 6px;
 }
 
 .ws-adj-btn:active {
