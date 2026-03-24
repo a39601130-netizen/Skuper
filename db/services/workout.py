@@ -357,17 +357,28 @@ async def get_workout_by_id(db: AsyncSession, workout_id: int) -> Optional[Dict]
     if not w:
         return None
     d = _workout_to_dict(w)
+    # Загружаем имена упражнений
+    exercise_ids = list(set(s.exercise_id for s in w.sets))
+    ex_result = await db.execute(
+        select(Exercise).where(Exercise.exercise_id.in_(exercise_ids))
+    )
+    ex_map = {e.exercise_id: e for e in ex_result.scalars().all()}
+
     d["sets"] = [
         {
             "id": s.id,
             "exercise_id": s.exercise_id,
+            "exercise_name": ex_map[s.exercise_id].name if s.exercise_id in ex_map else s.exercise_id,
             "set_number": s.set_number,
             "weight": s.weight,
             "reps": s.reps,
             "rpe": s.rpe,
             "notes": s.notes or "",
         }
-        for s in sorted(w.sets, key=lambda x: (x.exercise_id, x.set_number))
+        for s in sorted(w.sets, key=lambda x: (
+            ex_map[x.exercise_id].order if x.exercise_id in ex_map else 999,
+            x.set_number
+        ))
     ]
     return d
 

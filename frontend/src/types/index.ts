@@ -176,6 +176,9 @@ export interface WorkoutSetData {
   weight: number;
   reps: number;
   rpe: number;
+  exercise_id?: string;
+  exercise_name?: string;
+  notes?: string;
 }
 
 export interface NextWorkout {
