@@ -159,26 +159,41 @@ async def warmup_complete_callback(update: Update, context: ContextTypes.DEFAULT
 # УПРАЖНЕНИЯ
 # ============================================
 
+def _get_exercise_alt_info(exercise):
+    """Определить, есть ли альтернатива и используется ли она сейчас"""
+    exercise_id = exercise.get('exercise_id', '')
+    is_alt = exercise.get('_is_alternative', False)
+    original_id = exercise.get('_original_exercise_id', '')
+
+    if is_alt:
+        # Сейчас используется альтернатива — можно вернуться к оригиналу
+        return True, True
+    else:
+        # Проверяем, есть ли альтернатива для этого упражнения
+        has_alt = exercise_id in config.EXERCISE_ALTERNATIVES
+        return has_alt, False
+
+
 async def show_current_exercise(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать текущее упражнение"""
     query = update.callback_query
     workout_data = context.user_data['workout']
-    
+
     exercises = workout_data['exercises']
     idx = workout_data['current_exercise_idx']
-    
+
     if idx >= len(exercises):
         # Все упражнения выполнены
         from bot.handlers.workout.session import workout_complete
         return await workout_complete(update, context)
-    
+
     exercise = exercises[idx]
     service = get_workout_service()
-    
+
     # Получаем рекомендуемый вес
     weight_check = service.check_ready_for_increase(exercise['exercise_id'])
     current_weight = weight_check.get('current_weight', 0)
-    
+
     # Получаем историю последних подходов
     history = service.get_sets_for_exercise(exercise['exercise_id'], limit=4)
     history_text = ""
@@ -186,23 +201,25 @@ async def show_current_exercise(update: Update, context: ContextTypes.DEFAULT_TY
         last_reps = [str(h['reps']) for h in history[-4:]]
         last_weight = history[-1]['weight'] if history else current_weight
         history_text = f"📈 Прошлый раз: {last_weight} кг → {', '.join(last_reps)}"
-    
+
     # Формируем сообщение
     is_favorite = exercise.get('is_favorite', False)
     star = "⭐ " if is_favorite else ""
-    
+    is_alt = exercise.get('_is_alternative', False)
+    alt_label = " _(замена)_" if is_alt else ""
+
     reps_range = f"{exercise['reps_min']}-{exercise['reps_max']}"
     rest_sec = exercise.get('rest_sec', 120)
     rest_min = rest_sec // 60
     rest_text = f"{rest_min} мин" if rest_min > 0 else f"{rest_sec} сек"
-    
+
     # Целевой RPE для фазы
     phase = workout_data.get('phase', 'develop')
     phase_config = config.WORKOUT_PHASES.get(phase, {})
     target_rpe = f"{phase_config.get('rpe_min', 7)}-{phase_config.get('rpe_max', 8)}"
-    
+
     text = f"""
-{star}**{exercise['name']}** ({idx + 1}/{len(exercises)})
+{star}**{exercise['name']}**{alt_label} ({idx + 1}/{len(exercises)})
 ━━━━━━━━━━━━━━━━━━━━━━━
 
 📊 **Рекомендую:** {current_weight} кг × {reps_range} повторений
@@ -220,20 +237,23 @@ async def show_current_exercise(update: Update, context: ContextTypes.DEFAULT_TY
 Запиши результат (вес повторения):
 _Например: `{current_weight} 8`_
 """
-    
+
+    has_alt, is_alternative = _get_exercise_alt_info(exercise)
+    kb = get_set_input_keyboard(has_alternative=has_alt, is_alternative=is_alternative)
+
     if query:
         await query.edit_message_text(
             text,
             parse_mode="Markdown",
-            reply_markup=get_set_input_keyboard()
+            reply_markup=kb
         )
     else:
         await update.message.reply_text(
             text,
             parse_mode="Markdown",
-            reply_markup=get_set_input_keyboard()
+            reply_markup=kb
         )
-    
+
     return WorkoutStates.SET_INPUT
 
 
@@ -300,31 +320,46 @@ async def set_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def rpe_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора RPE"""
     query = update.callback_query
-    await query.answer()
-    
+
     parts = query.data.split('_')
     if len(parts) < 2:
+        await query.answer()
         return
     try:
         rpe = int(parts[1])
     except (ValueError, IndexError):
+        await query.answer()
         return
-    workout_data = context.user_data['workout']
-    pending = workout_data.pop('pending_set', {})
-    
+
+    workout_data = context.user_data.get('workout', {})
+    pending = workout_data.get('pending_set')
+
+    if not pending:
+        await query.answer("⚠️ Данные подхода не найдены, введи заново")
+        return WorkoutStates.SET_INPUT
+
+    # Удаляем pending только после успешной валидации
+    workout_data.pop('pending_set', None)
+
     exercise = workout_data['exercises'][workout_data['current_exercise_idx']]
     service = get_workout_service()
-    
+
     # Сохраняем подход в таблицу
-    set_id = service.add_set(
-        workout_id=workout_data['workout_id'],
-        exercise_id=exercise['exercise_id'],
-        set_num=workout_data['current_set'],
-        weight=pending['weight'],
-        reps=pending['reps'],
-        rpe=rpe
-    )
-    
+    try:
+        set_id = service.add_set(
+            workout_id=workout_data['workout_id'],
+            exercise_id=exercise['exercise_id'],
+            set_num=workout_data['current_set'],
+            weight=pending['weight'],
+            reps=pending['reps'],
+            rpe=rpe
+        )
+    except Exception as e:
+        logger.error(f"Ошибка сохранения подхода в Sheets: {e}")
+        # Подход не сохранился в Sheets, но продолжаем тренировку
+
+    await query.answer()
+
     # Сохраняем локально для статистики
     workout_data['sets_data'].append({
         'exercise_id': exercise['exercise_id'],
@@ -333,13 +368,13 @@ async def rpe_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'reps': pending['reps'],
         'rpe': rpe
     })
-    
+
     # Проверяем, есть ли ещё подходы
     if workout_data['current_set'] < exercise['sets']:
         # Ещё есть подходы - запускаем таймер
         workout_data['current_set'] += 1
         rest_sec = exercise.get('rest_sec', 120)
-        
+
         return await start_rest_timer(update, context, rest_sec)
     else:
         # Упражнение завершено
@@ -419,6 +454,7 @@ async def _run_timer(update, context, seconds: int, chat_id: int, message_id: in
         if workout_data.get('timer_message_id') == message_id:
             exercise = workout_data['exercises'][workout_data['current_exercise_idx']]
             
+            has_alt, is_alt = _get_exercise_alt_info(exercise)
             await context.bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
@@ -428,7 +464,7 @@ async def _run_timer(update, context, seconds: int, chat_id: int, message_id: in
 
 Запиши результат (вес повторения):""",
                 parse_mode="Markdown",
-                reply_markup=get_set_input_keyboard()
+                reply_markup=get_set_input_keyboard(has_alternative=has_alt, is_alternative=is_alt)
             )
             
     except Exception as e:
@@ -531,11 +567,70 @@ async def exercise_skip_callback(update: Update, context: ContextTypes.DEFAULT_T
     """Пропустить упражнение"""
     query = update.callback_query
     await query.answer("⏭️")
-    
+
     workout_data = context.user_data['workout']
     workout_data['current_exercise_idx'] += 1
     workout_data['current_set'] = 1
-    
+
+    return await show_current_exercise(update, context)
+
+
+async def exercise_alternative_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Переключиться на альтернативное упражнение или вернуться к оригиналу"""
+    query = update.callback_query
+    workout_data = context.user_data['workout']
+    idx = workout_data['current_exercise_idx']
+    exercise = workout_data['exercises'][idx]
+
+    if exercise.get('_is_alternative'):
+        # Возврат к оригиналу
+        original = exercise.get('_original')
+        if original:
+            workout_data['exercises'][idx] = original
+            await query.answer("🔄 Оригинальное упражнение")
+        else:
+            await query.answer("⚠️ Оригинал не найден")
+            return WorkoutStates.SET_INPUT
+    else:
+        # Переключение на альтернативу
+        alt_data = config.EXERCISE_ALTERNATIVES.get(exercise.get('exercise_id'))
+        if not alt_data:
+            await query.answer("⚠️ Нет альтернативы")
+            return WorkoutStates.SET_INPUT
+
+        # Создаём альтернативное упражнение с сохранением оригинала
+        alt_exercise = dict(alt_data)
+        alt_exercise['_is_alternative'] = True
+        alt_exercise['_original_exercise_id'] = exercise['exercise_id']
+        alt_exercise['_original'] = exercise  # Для возврата
+
+        workout_data['exercises'][idx] = alt_exercise
+        await query.answer("🔄 Замена!")
+
+    workout_data['current_set'] = 1
+    return await show_current_exercise(update, context)
+
+
+async def exercise_later_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отложить упражнение — перенести в конец списка"""
+    query = update.callback_query
+    workout_data = context.user_data['workout']
+    idx = workout_data['current_exercise_idx']
+    exercises = workout_data['exercises']
+
+    if idx >= len(exercises) - 1:
+        await query.answer("Это уже последнее упражнение")
+        return WorkoutStates.SET_INPUT
+
+    # Переносим текущее упражнение в конец
+    exercise = exercises.pop(idx)
+    exercises.append(exercise)
+
+    # idx не меняем — на его месте теперь следующее упражнение
+    workout_data['current_set'] = 1
+
+    name = exercise.get('name_short', exercise.get('name', ''))
+    await query.answer(f"⏬ {name} → в конец")
     return await show_current_exercise(update, context)
 
 
@@ -543,6 +638,6 @@ async def workout_end_early_callback(update: Update, context: ContextTypes.DEFAU
     """Завершить тренировку досрочно"""
     query = update.callback_query
     await query.answer()
-    
+
     from bot.handlers.workout.session import workout_complete
     return await workout_complete(update, context)

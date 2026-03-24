@@ -89,16 +89,20 @@ def get_warmup_complete_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_set_input_keyboard() -> InlineKeyboardMarkup:
+def get_set_input_keyboard(has_alternative=True, is_alternative=False) -> InlineKeyboardMarkup:
     """Клавиатура во время ввода подхода"""
-    keyboard = [
-        [
-            InlineKeyboardButton("⏭️ Пропустить упражнение", callback_data="exercise_skip"),
-        ],
-        [
-            InlineKeyboardButton("🏁 Завершить тренировку", callback_data="workout_end_early"),
-        ]
-    ]
+    keyboard = []
+    # Кнопки замены и переноса
+    row1 = []
+    if has_alternative:
+        label = "🔄 Оригинал" if is_alternative else "🔄 Замена"
+        row1.append(InlineKeyboardButton(label, callback_data="exercise_alt"))
+    row1.append(InlineKeyboardButton("⏬ Позже", callback_data="exercise_later"))
+    keyboard.append(row1)
+    keyboard.append([
+        InlineKeyboardButton("⏭️ Пропустить", callback_data="exercise_skip"),
+        InlineKeyboardButton("🏁 Завершить", callback_data="workout_end_early"),
+    ])
     return InlineKeyboardMarkup(keyboard)
 
 

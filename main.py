@@ -129,6 +129,8 @@ from bot.handlers.workout.exercises import (
     timer_add_callback,
     exercise_next_callback,
     exercise_skip_callback,
+    exercise_alternative_callback,
+    exercise_later_callback,
     workout_end_early_callback
 )
 from bot.handlers.workout.progress import (
@@ -623,6 +625,8 @@ def main():
             ],
             WorkoutStates.SET_INPUT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, set_input_handler),
+                CallbackQueryHandler(exercise_alternative_callback, pattern="^exercise_alt$"),
+                CallbackQueryHandler(exercise_later_callback, pattern="^exercise_later$"),
                 CallbackQueryHandler(exercise_skip_callback, pattern="^exercise_skip$"),
                 CallbackQueryHandler(workout_end_early_callback, pattern="^workout_end_early$"),
             ],
@@ -860,6 +864,8 @@ def _register_handlers(application):
             WorkoutStates.EXERCISE_START: [CallbackQueryHandler(warmup_complete_callback, pattern="^warmup_complete$")],
             WorkoutStates.SET_INPUT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, set_input_handler),
+                CallbackQueryHandler(exercise_alternative_callback, pattern="^exercise_alt$"),
+                CallbackQueryHandler(exercise_later_callback, pattern="^exercise_later$"),
                 CallbackQueryHandler(exercise_skip_callback, pattern="^exercise_skip$"),
                 CallbackQueryHandler(workout_end_early_callback, pattern="^workout_end_early$"),
             ],
