@@ -2,6 +2,8 @@
 
 .ws-page {
   padding-bottom: 16px !important;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* Progress bar */
@@ -43,6 +45,8 @@
   font-size: 22px;
   font-weight: 700;
   margin-bottom: 4px;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .ws-meta {
@@ -254,6 +258,7 @@
   align-items: flex-start;
   gap: 6px;
   line-height: 1.4;
+  word-break: break-word;
 }
 .ws-notes-icon {
   flex-shrink: 0;
@@ -332,6 +337,28 @@
   color: var(--text-muted);
 }
 
+/* Alternative button */
+.ws-alt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ws-alt-btn:active {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* Set input */
 .ws-set-input {
   padding: 16px;
@@ -352,41 +379,48 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .ws-adj-btn {
-  width: 56px;
-  height: 44px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg-secondary);
+  width: 52px;
+  height: 48px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: var(--bg-card);
   color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.15s;
   flex-shrink: 0;
 }
 
 .ws-adj-btn:active {
   background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  transform: scale(0.93);
 }
 
 .ws-weight-input {
   flex: 1;
-  height: 44px;
+  height: 48px;
   text-align: center;
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
   background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
   color: var(--text-primary);
   outline: none;
+  font-variant-numeric: tabular-nums;
 }
 
 .ws-weight-input:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 /* RPE grid */

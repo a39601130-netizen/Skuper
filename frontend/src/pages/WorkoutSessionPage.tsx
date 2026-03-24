@@ -701,6 +701,11 @@ export default function WorkoutSessionPage() {
             <div className="ws-ex-counter">{exIdx + 1} / {totalExercises}</div>
             <h2>{currentEx.name}{originals[exIdx] ? ' (замена)' : ''}</h2>
             <p className="ws-meta">{currentEx.category}</p>
+            {(EXERCISE_ALTERNATIVES[currentEx.exercise_id] || originals[exIdx]) && (
+              <button className="ws-alt-btn" onClick={handleAlternative}>
+                🔄 {originals[exIdx] ? 'Вернуть оригинал' : 'Альтернатива'}
+              </button>
+            )}
           </div>
 
           {/* Technical notes */}
@@ -812,7 +817,8 @@ export default function WorkoutSessionPage() {
               <button
                 className="btn btn-primary btn-full"
                 onClick={handleSetDone}
-                disabled={setWeight <= 0 || setReps <= 0}
+                disabled={setReps <= 0}
+                style={{ padding: '14px 0', fontSize: 16 }}
               >
                 Подход завершён
               </button>
@@ -846,18 +852,11 @@ export default function WorkoutSessionPage() {
 
           {/* Exercise actions */}
           <div className="ws-actions">
-            {(EXERCISE_ALTERNATIVES[currentEx.exercise_id] || originals[exIdx]) && (
-              <button className="btn btn-ghost" onClick={handleAlternative}>
-                🔄 {originals[exIdx] ? 'Оригинал' : 'Замена'}
-              </button>
-            )}
             {exIdx < totalExercises - 1 && (
               <button className="btn btn-ghost" onClick={handleExerciseLater}>
                 ⏬ Позже
               </button>
             )}
-          </div>
-          <div className="ws-actions">
             <button className="btn btn-ghost" onClick={handleSkipExercise}>
               Пропустить
             </button>

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getMonthlySummary, createTransaction, getReferences } from '../api/client';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, TrendingUp, TrendingDown, AlertTriangle, Send } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, TrendingUp, TrendingDown, AlertTriangle, Send, Plus } from 'lucide-react';
 import type { MonthlySummary, References } from '../types';
 
 const MONTH_NAMES = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -164,6 +164,7 @@ export default function DashboardPage() {
           {summary.accounts.map((acc) => (
             <div className="hero-account-chip" key={acc.name} role="listitem">
               <span>{acc.emoji || '💳'}</span>
+              <span className="chip-name">{acc.name}</span>
               <span className="amount">{formatMoney(acc.current, acc.currency)}</span>
             </div>
           ))}
@@ -299,19 +300,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Quick actions */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13 }} onClick={() => navigate('/income')}>
-          <TrendingUp size={14} /> Доходы
-        </button>
-        <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13 }} onClick={() => navigate(`/expenses?month=${month}&year=${year}`)}>
-          <TrendingDown size={14} /> Расходы
-        </button>
-      </div>
-
-      <button className="btn btn-primary btn-full" style={{ marginTop: 8, padding: '14px 0' }} onClick={() => navigate('/add')}>
-        <Plus size={18} /> Добавить транзакцию
-      </button>
     </div>
   );
 }
