@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import { AlertOctagon, RefreshCw } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -20,8 +21,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="page">
-          <div className="error-box">
-            <div className="error-icon">💥</div>
+          <div className="error-box" role="alert">
+            <AlertOctagon size={48} color="var(--danger)" />
             <div className="error-text">Ошибка: {this.state.error}</div>
             <button
               className="btn btn-primary"
@@ -30,7 +31,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                 window.location.reload();
               }}
             >
-              Перезагрузить
+              <RefreshCw size={16} /> Перезагрузить
             </button>
           </div>
         </div>

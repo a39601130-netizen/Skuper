@@ -1,90 +1,16 @@
 """
-Главное меню бота
+Клавиатуры бота (минимальные — основной UI в Mini App)
 """
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
+import config
 
 
-def get_main_menu() -> InlineKeyboardMarkup:
-    """Главное меню с модулями"""
+def get_mini_app_button() -> InlineKeyboardMarkup:
+    """Кнопка открытия Mini App"""
     keyboard = [
-        [
-            InlineKeyboardButton("💰 Финансы", callback_data="module_finance"),
-            InlineKeyboardButton("🏋️ Тренировки", callback_data="module_workout")
-        ],
-        [
-            InlineKeyboardButton("🤖 AI Советник", callback_data="module_advisor")
-        ],
-        [
-            InlineKeyboardButton("⚙️ Настройки", callback_data="module_settings")
-        ]
+        [InlineKeyboardButton(
+            "📱 Открыть Mini App",
+            web_app=WebAppInfo(url=config.MINI_APP_URL)
+        )]
     ]
-    return InlineKeyboardMarkup(keyboard)
-
-
-def get_finance_menu() -> InlineKeyboardMarkup:
-    """Меню финансов"""
-    keyboard = [
-        [
-            InlineKeyboardButton("💸 Расход", callback_data="add_expense"),
-            InlineKeyboardButton("💰 Доход", callback_data="add_income")
-        ],
-        [
-            InlineKeyboardButton("💳 Балансы", callback_data="finance_balance"),
-            InlineKeyboardButton("📊 Статистика", callback_data="finance_stats")
-        ],
-        [
-            InlineKeyboardButton("💵 Доходы", callback_data="finance_income_stats"),
-            InlineKeyboardButton("📈 Еженедельный отчет", callback_data="finance_weekly")
-        ],
-        [
-            InlineKeyboardButton("📜 История", callback_data="finance_history")
-        ],
-        [
-            InlineKeyboardButton("🔙 Главное меню", callback_data="menu_main")
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-
-def get_workout_menu() -> InlineKeyboardMarkup:
-    """Меню тренировок"""
-    keyboard = [
-        [
-            InlineKeyboardButton("▶️ Начать тренировку", callback_data="workout_start"),
-        ],
-        [
-            InlineKeyboardButton("📊 Прогресс", callback_data="workout_progress"),
-            InlineKeyboardButton("🏋️ Веса", callback_data="workout_weights")
-        ],
-        [
-            InlineKeyboardButton("📜 История", callback_data="workout_history"),
-            InlineKeyboardButton("📅 Следующая", callback_data="workout_next")
-        ],
-        [
-            InlineKeyboardButton("🔙 Главное меню", callback_data="menu_main")
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-
-def get_advisor_menu() -> InlineKeyboardMarkup:
-    """Меню AI советника"""
-    keyboard = [
-        [
-            InlineKeyboardButton("💰 Анализ финансов", callback_data="advisor_finance"),
-            InlineKeyboardButton("🏋️ Анализ тренировок", callback_data="advisor_workout")
-        ],
-        [
-            InlineKeyboardButton("❓ Задать вопрос", callback_data="advisor_ask")
-        ],
-        [
-            InlineKeyboardButton("🔙 Главное меню", callback_data="menu_main")
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-
-def get_back_to_main() -> InlineKeyboardMarkup:
-    """Кнопка возврата в главное меню"""
-    keyboard = [[InlineKeyboardButton("🔙 Главное меню", callback_data="menu_main")]]
     return InlineKeyboardMarkup(keyboard)

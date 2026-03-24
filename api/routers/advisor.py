@@ -43,13 +43,13 @@ async def ask(
             summary = await get_monthly_summary(db)
             context = _finance_context(summary)
         except Exception:
-            pass
+            logger.exception("Failed to load finance context for advisor")
     elif data.context_type == "workout":
         try:
             history = await get_workout_history(db, limit=5)
             context = _workout_context(history)
         except Exception:
-            pass
+            logger.exception("Failed to load workout context for advisor")
 
     if data.screen_context:
         context += f"\n\nПользователь на экране: {data.screen_context}"

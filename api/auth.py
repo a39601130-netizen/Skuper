@@ -9,6 +9,8 @@ from urllib.parse import parse_qs, unquote
 
 from config import TELEGRAM_BOT_TOKEN
 
+AUTH_EXPIRE_SECONDS = 7200  # 2 hours
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +50,7 @@ def validate_init_data(init_data: str) -> dict | None:
             return None
 
         auth_date = parsed.get("auth_date", [None])[0]
-        if auth_date and (time.time() - int(auth_date)) > 7200:  # 2 часа
+        if auth_date and (time.time() - int(auth_date)) > AUTH_EXPIRE_SECONDS:
             logger.warning("Auth failed: expired auth_date=%s", auth_date)
             return None
 

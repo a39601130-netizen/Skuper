@@ -7,7 +7,7 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 import config
 
 # Эталонная структура данных (из кода бота)
@@ -89,13 +89,13 @@ CATEGORIES_COLUMNS = [
 
 def connect_to_sheets():
     """Подключение к Google Sheets"""
-    scope = [
+    scopes = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(
-        config.GOOGLE_CREDENTIALS_FILE, scope
+    creds = Credentials.from_service_account_file(
+        config.GOOGLE_CREDENTIALS_FILE, scopes=scopes
     )
     client = gspread.authorize(creds)
     spreadsheet = client.open_by_key(config.GOOGLE_SHEETS_ID)

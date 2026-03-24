@@ -1,178 +1,76 @@
-# Финансовый бот - инструкция для отладки
+# Финансы — инструкция для отладки
+
+## Архитектура
+Весь UI финансов — в **Mini App** (React). Бот не участвует.
 
 ## Файлы для изучения (в порядке приоритета):
 
-### Основные хендлеры:
-- `bot/handlers/transactions.py` - добавление транзакций (доходы/расходы/переводы/обмен)
-- `bot/handlers/balance.py` - работа с балансом
-- `bot/handlers/reports.py` - отчёты
-- `bot/handlers/advisor.py` - AI советник
+### API роутеры:
+- `api/routers/transactions.py` — GET/POST/DELETE /api/transactions (фильтры, валидация)
+- `api/routers/accounts.py` — GET /api/accounts
+- `api/routers/categories.py` — GET /api/categories, GET /api/categories/references
+- `api/routers/stats.py` — GET /api/stats/monthly|income|weekly|daily-spending
+- `api/routers/recurring.py` — GET/POST /api/recurring, DELETE, POST apply
+- `api/routers/advisor.py` — POST /api/advisor/ask, GET analysis, GET insights
+
+### Сервис (БД):
+- `db/services/finance.py` — вся бизнес-логика финансов (async, SQLAlchemy)
+  - `get_accounts(db)` — список счетов с балансами
+  - `add_transaction(db, ...)` — добавить транзакцию (обновляет балансы)
+  - `get_monthly_summary(db, year, month)` — сводка за месяц
+  - `get_category_spending(db, year, month)` — расходы по категориям
+  - `get_daily_spending(db, year, month)` — расходы по дням
+- `db/services/recurring.py` — CRUD повторяющихся транзакций + apply
+
+### Frontend:
+- `frontend/src/pages/DashboardPage.tsx` — сводка, счета, категории, графики, AI инсайты
+- `frontend/src/pages/HistoryPage.tsx` — транзакции с фильтрами и свайп-удалением
+- `frontend/src/pages/AddTransactionPage.tsx` — пошаговый ввод транзакции
+- `frontend/src/pages/AdvisorPage.tsx` — AI советник
+- `frontend/src/api/client.ts` — API вызовы
+- `frontend/src/components/charts/` — ExpensePieChart, SpendingTrendChart
+
+### Модели (db/models.py):
+- **Account** — id, name, balance, currency
+- **Category** — id, name, type (Расход/Доход/Перевод), emoji, budget_limit
+- **Transaction** — id, date, type, account_id, category_id, amount, comment, hours, synced_to_sheets
+- **RecurringTransaction** — id, name, type, account_id, category_id, amount, currency, frequency, next_date, is_active
 
 ### Сервисы:
-- `services/sheets.py` - работа с Google Sheets (класс `GoogleSheetsService`)
-- `services/ai_advisor.py` - интеграция с DeepSeek AI
-
-### Клавиатуры:
-- `bot/keyboards/menus.py` - все меню для финансов
+- `services/ai_advisor.py` — AIAdvisor (DeepSeek API)
+- `services/sheets.py` — GoogleSheetsService (бэкап)
+- `services/backup.py` — BackupService.backup_finances()
 
 ### Утилиты:
-- `utils/formatters.py` - форматирование сообщений, парсинг quick input
-- `utils/debug_logger.py` - логирование ошибок
+- `utils/formatters.py` — форматирование, parse_quick_input()
+- `utils/timezone.py` — now_minsk(), today_minsk()
 
 ---
 
-## FSM состояния (TransactionStates):
+## Ключевые константы (config.py):
+- `BASE_HOURLY_RATE = 6.5` — ставка BYN/ч
+- `CATEGORY_EMOJI` — маппинг категория→эмодзи
 
-```
-SELECT_TYPE → SELECT_DATE → SELECT_ACCOUNT → SELECT_CATEGORY → ENTER_AMOUNT → ENTER_COMMENT → CONFIRM
-                                ↓
-                          SELECT_TO_ACCOUNT (для переводов)
-                                ↓
-                          SELECT_CURRENCY → ENTER_EXCHANGE_RATE → ENTER_AMOUNT_TO (для обмена валюты)
-```
-
-### Состояния:
-- `SELECT_TYPE` - выбор типа (Доход/Расход/Перевод/Обмен валюты)
-- `SELECT_DATE` - выбор даты (сегодня/вчера/позавчера/другой день)
-- `SELECT_ACCOUNT` - выбор счёта списания
-- `SELECT_CATEGORY` - выбор категории
-- `ENTER_AMOUNT` - ввод суммы
-- `SELECT_TO_ACCOUNT` - выбор счёта зачисления (переводы/обмен)
-- `SELECT_CURRENCY` - выбор валюты (BYN/USD/EUR/RUB)
-- `ENTER_EXCHANGE_RATE` - ввод курса обмена
-- `ENTER_AMOUNT_TO` - ввод суммы зачисления
-- `ENTER_COMMENT` - ввод комментария
-- `ENTER_HOURS` - ввод часов (для дохода "Зарплата/Чаевые")
-- `CONFIRM` - подтверждение
+## API Authentication:
+`X-Telegram-Init-Data` → HMAC-SHA256 → проверка TELEGRAM_USER_ID
 
 ---
 
-## Callback patterns:
-
-### Типы транзакций:
-- `add_expense` - расход
-- `add_income` - доход
-- `add_transfer` - перевод
-- `add_exchange` - обмен валюты
-
-### Даты:
-- `date_today`, `date_yesterday`, `date_before_yesterday`
-- `date_N` - конкретный день (N = 1-31)
-- `date_custom` - ввод вручную
-
-### Счета:
-- `expense_ИмяСчета` - счёт для расхода
-- `income_ИмяСчета` - счёт для дохода
-- `from_ИмяСчета` - счёт списания (перевод)
-- `to_ИмяСчета` - счёт зачисления (перевод)
-- `exchange_from_ИмяСчета` - счёт списания (обмен)
-- `exchange_to_ИмяСчета` - счёт зачисления (обмен)
-
-### Категории:
-- `quick_Категория` - быстрые категории расходов
-- `cat_Категория` - полный список категорий
-- `show_all_categories` - показать все категории
-
-### Валюты:
-- `currency_BYN`, `currency_USD`, `currency_EUR`, `currency_RUB`
-
-### Подтверждение:
-- `confirm_yes` - подтвердить
-- `confirm_no` - отменить
-- `confirm_edit` - редактировать
-
----
-
-## Google Sheets структура:
-
-### Таблица: `config.GOOGLE_SHEETS_ID`
-
-| Лист | Константа | Описание |
-|------|-----------|----------|
-| Транзакции | `SHEET_TRANSACTIONS` | Все операции |
-| Категории | `SHEET_CATEGORIES` | Бюджеты по категориям |
-| Счета | `SHEET_ACCOUNTS` | Балансы счетов |
-| Справочники | `SHEET_REFERENCES` | Типы, счета, категории |
-| Дашборд | `SHEET_DASHBOARD` | Сводка |
-
-### Структура листа "Транзакции":
-| Колонка | Содержимое |
-|---------|------------|
-| A | День (1-31) |
-| B | Тип (Доход/Расход/Перевод/Обмен валюты) |
-| C | Счёт |
-| D | Категория |
-| E | Сумма |
-| F | Счёт Куда |
-| G | Комментарий |
-| H | Полная дата (формула) |
-| I | Часы |
-| J | Часы×6.5 (формула) |
-| K | Курс обмена |
-| L | Сумма зачисления |
-| M | Валюта |
-
-**Важно:** Строки 1-3 - настройки/заголовки, данные начинаются с 4-й строки.
-
----
-
-## Хранение данных транзакции:
-
-```python
-class TransactionData:
-    trans_type: str       # Доход/Расход/Перевод/Обмен валюты
-    account: str          # Счёт списания
-    category: str         # Категория
-    amount: float         # Сумма списания
-    to_account: str       # Счёт зачисления
-    comment: str          # Комментарий
-    hours: float          # Часы работы
-    day: int              # День месяца
-    exchange_rate: float  # Курс обмена
-    amount_to: float      # Сумма зачисления
-    currency: str         # Валюта (по умолчанию "BYN")
-```
-
-Хранится в `user_transactions[user_id]` (глобальный словарь).
-
----
-
-## Типичные проблемы и решения:
+## Типичные проблемы:
 
 ### 1. Транзакция не сохраняется
-- Проверь `trans.to_dict()` перед записью
-- Смотри логи в `bug_tracker.log_bug()`
+- Проверь `db/services/finance.py:add_transaction()`
+- Проверь `api/routers/transactions.py` POST endpoint
+- Проверь обновление баланса счёта
 
-### 2. FSM застревает
-- Проверь возврат правильного состояния из хендлера
-- Убедись что `ConversationHandler.END` возвращается при ошибке
+### 2. Статистика неправильная
+- Проверь `db/services/finance.py:get_monthly_summary()`
+- Проверь фильтрацию по дате (timezone!)
 
-### 3. Callback не обрабатывается
-- Проверь pattern в `ConversationHandler`
-- Логируй `query.data` для отладки
+### 3. Категории не загружаются
+- Проверь `api/routers/categories.py`
+- Проверь seed данные в `db/seed.py`
 
-### 4. Ошибка Google Sheets API
-- Проверь переподключение (`_ensure_connection()`)
-- Смотри декоратор `@retry_on_error`
-
-### 5. Quick input не работает
-- Проверь `parse_quick_input()` в `utils/formatters.py`
-- Формат: "сумма категория" или "сумма"
-
----
-
-## Ключевые функции:
-
-### sheets.py:
-- `get_sheets_service()` - singleton сервиса
-- `add_transaction()` - добавить транзакцию
-- `get_references()` - получить справочники
-- `get_accounts_balance()` - балансы счетов
-- `get_categories_budget()` - бюджеты категорий
-- `get_recent_transactions()` - последние транзакции
-- `delete_transaction()` - удалить транзакцию
-
-### transactions.py:
-- `get_user_transaction(user_id)` - получить/создать TransactionData
-- `menu_add_callback()` - точка входа из меню
-- `show_confirmation()` - показать превью перед сохранением
+### 4. AI советник не отвечает
+- Проверь `services/ai_advisor.py` — DeepSeek API ключ
+- Проверь `api/routers/advisor.py` endpoints

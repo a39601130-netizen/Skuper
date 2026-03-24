@@ -12,7 +12,8 @@ alembic==1.14.0
 
 # Google Sheets
 gspread==5.12.4
-oauth2client==4.1.3
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
 
 # HTTP клиент для DeepSeek
 httpx>=0.25.0,<1.0.0

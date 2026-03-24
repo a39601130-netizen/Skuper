@@ -6,7 +6,7 @@ import asyncio
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils.debug_logger import bug_tracker
-from bot.keyboards.menus import get_main_menu
+from bot.keyboards.main_menu import get_mini_app_button
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ async def bugs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not unresolved:
         await update.message.reply_text(
             "✅ Нерешенных багов нет!",
-            reply_markup=get_main_menu()
+            reply_markup=get_mini_app_button()
         )
         return
 
@@ -41,7 +41,7 @@ async def bugs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         response,
         parse_mode=None,
-        reply_markup=get_main_menu()
+        reply_markup=get_mini_app_button()
     )
 
 
@@ -54,7 +54,7 @@ async def clear_bugs_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text(
         f"🧹 Решенные баги удалены.\n\n"
         f"Осталось нерешенных: {unresolved_count}",
-        reply_markup=get_main_menu()
+        reply_markup=get_mini_app_button()
     )
 
 
@@ -111,11 +111,11 @@ async def sync_balances_command(update: Update, context: ContextTypes.DEFAULT_TY
         if not_found:
             text += f"\n\n⚠️ Не найдены в БД: {', '.join(not_found)}"
 
-        await msg.edit_text(text, reply_markup=get_main_menu())
+        await msg.edit_text(text, reply_markup=get_mini_app_button())
 
     except Exception as e:
         logger.error(f"Sync balances error: {e}", exc_info=True)
         await msg.edit_text(
             f"❌ Ошибка синхронизации:\n{str(e)[:200]}",
-            reply_markup=get_main_menu()
+            reply_markup=get_mini_app_button()
         )

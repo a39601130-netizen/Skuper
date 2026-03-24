@@ -8,7 +8,6 @@ from utils.timezone import now_minsk
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from bot.keyboards.main_menu import get_main_menu
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,6 @@ def get_backup_menu() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("💰 Финансы", callback_data="backup_type_finance")],
         [InlineKeyboardButton("🏋️ Тренировки", callback_data="backup_type_workout")],
         [InlineKeyboardButton("📦 Всё сразу", callback_data="backup_type_all")],
-        [InlineKeyboardButton("🔙 Назад", callback_data="module_settings")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -135,7 +133,6 @@ async def backup_month_callback(update: Update, context: ContextTypes.DEFAULT_TY
         # Кнопки после бэкапа
         keyboard = [
             [InlineKeyboardButton("🔄 Ещё бэкап", callback_data="backup_menu")],
-            [InlineKeyboardButton("🔙 Главное меню", callback_data="menu_main")]
         ]
 
         await query.edit_message_text(

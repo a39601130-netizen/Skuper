@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTelegram } from '../hooks/useTelegram';
 import {
@@ -100,7 +100,7 @@ export default function WorkoutSessionPage() {
   const [setNum, setSetNum] = useState(1);
   const [setWeight, setSetWeight] = useState(0);
   const [setReps, setSetReps] = useState(0);
-  const [, setSetRpe] = useState(0);
+  const [setRpe, setSetRpe] = useState(0);
   const [setsLog, setSetsLog] = useState<Record<string, SetEntry[]>>({});
   const [showRpe, setShowRpe] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -163,7 +163,7 @@ export default function WorkoutSessionPage() {
   }, [workoutId, exIdx, setNum, setsLog, stage]);
 
   // ---- Current exercise ----
-  const exercises = plan?.exercises || [];
+  const exercises = useMemo(() => plan?.exercises || [], [plan]);
   const currentEx = exercises[exIdx] as ExerciseWithDetails | undefined;
   const totalExercises = exercises.length;
 
@@ -483,7 +483,7 @@ export default function WorkoutSessionPage() {
 
     return (
       <div className="ws-timer-container">
-        <svg width="200" height="200" viewBox="0 0 200 200">
+        <svg width="200" height="200" viewBox="0 0 200 200" role="img" aria-label={`Таймер отдыха: ${mins}:${secs.toString().padStart(2, '0')}`}>
           <circle cx="100" cy="100" r={r} fill="none" stroke="var(--border)" strokeWidth="8" />
           <circle
             cx="100" cy="100" r={r} fill="none"
@@ -502,8 +502,8 @@ export default function WorkoutSessionPage() {
 
   // ---- Error state ----
   if (error) return (
-    <div className="page ws-page">
-      <div className="error-box">
+    <div className="page ws-page workout-ctx">
+      <div className="error-box" role="alert">
         <div className="error-icon">&#x26A0;&#xFE0F;</div>
         <div className="error-text">{error}</div>
         <button className="btn btn-primary" onClick={() => { setError(''); navigate('/workouts'); }}>
@@ -515,15 +515,17 @@ export default function WorkoutSessionPage() {
 
   // ---- Loading ----
   if (stage === 'loading') return (
-    <div className="page ws-page">
+    <div className="page ws-page workout-ctx" aria-busy="true">
       <div className="loading">Загрузка тренировки...</div>
     </div>
   );
 
   return (
-    <div className="page ws-page">
+    <div className="page ws-page workout-ctx">
       {/* Progress bar */}
-      <div className="ws-progress-bar">
+      <div className="ws-progress-bar" role="progressbar"
+        aria-valuenow={Math.round(getProgress())} aria-valuemin={0} aria-valuemax={100}
+        aria-label="Прогресс тренировки">
         <div className="ws-progress-fill" style={{ width: `${getProgress()}%` }} />
       </div>
 
@@ -666,6 +668,8 @@ export default function WorkoutSessionPage() {
               key={phase.id}
               className={`ws-warmup-item ${warmupDone[i] ? 'done' : ''}`}
               onClick={() => toggleWarmup(i)}
+              aria-label={`${phase.title}: ${warmupDone[i] ? 'выполнено' : 'не выполнено'}`}
+              aria-pressed={warmupDone[i]}
             >
               <span className="ws-warmup-check">
                 {warmupDone[i] ? '✅' : '⬜'}
@@ -820,20 +824,22 @@ export default function WorkoutSessionPage() {
                 {setWeight} кг x {setReps} — Насколько тяжело?
               </div>
               <div className="ws-rpe-grid">
-                {[5, 6, 7, 8, 9, 10].map(r => (
+                {[5, 6, 7, 8, 9, 10].map(r => {
+                  const desc = r === 5 ? 'Легко' : r === 6 ? 'Умеренно' : r === 7 ? 'Норм' :
+                       r === 8 ? 'Тяжело' : r === 9 ? 'Очень' : 'Макс';
+                  return (
                   <button
                     key={r}
-                    className={`ws-rpe-btn ${r <= 7 ? 'easy' : r <= 8 ? 'medium' : 'hard'}`}
+                    className={`ws-rpe-btn ${r <= 7 ? 'easy' : r <= 8 ? 'medium' : 'hard'}${setRpe === r ? ' selected' : ''}`}
                     onClick={() => handleRpeSelect(r)}
                     disabled={saving}
+                    aria-label={`RPE ${r}: ${desc}`}
                   >
                     <span className="ws-rpe-num">{r}</span>
-                    <span className="ws-rpe-desc">
-                      {r === 5 ? 'Легко' : r === 6 ? 'Умеренно' : r === 7 ? 'Норм' :
-                       r === 8 ? 'Тяжело' : r === 9 ? 'Очень' : 'Макс'}
-                    </span>
+                    <span className="ws-rpe-desc">{desc}</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

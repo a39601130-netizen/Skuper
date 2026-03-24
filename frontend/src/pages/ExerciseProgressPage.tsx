@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentWeights, getExerciseProgress } from '../api/client';
+import { ListPageSkeleton } from '../components/Skeleton';
+import { ChevronLeft, AlertTriangle, BarChart3, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import type { ExerciseWeight, ExerciseProgress } from '../types';
 
-const TREND_ICON: Record<string, string> = {
-  up: '📈',
-  down: '📉',
-  stable: '➡️',
-  no_data: '—',
+const TREND_ICON: Record<string, typeof TrendingUp> = {
+  up: TrendingUp,
+  down: TrendingDown,
+  stable: Minus,
+};
+
+const TREND_COLOR: Record<string, string> = {
+  up: 'var(--success)',
+  down: 'var(--danger)',
+  stable: 'var(--text-muted)',
 };
 
 export default function ExerciseProgressPage() {
@@ -40,7 +47,6 @@ export default function ExerciseProgressPage() {
     setProgress(null);
     try {
       const p = await getExerciseProgress(exerciseId);
-      // Проверяем, что пользователь не переключился на другое упражнение
       setSelected((current) => {
         if (current === exerciseId) {
           setProgress(p);
@@ -54,14 +60,16 @@ export default function ExerciseProgressPage() {
     }
   };
 
-  if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  if (loading) return <ListPageSkeleton />;
   if (error) return (
-    <div className="page">
-      <div className="error-box">
-        <div className="error-icon">⚠️</div>
+    <div className="page workout-ctx">
+      <div className="error-box" role="alert">
+        <AlertTriangle size={48} color="var(--danger)" />
         <div className="error-text">{error}</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-ghost" onClick={() => navigate(-1)}>← Назад</button>
+          <button className="btn btn-ghost" onClick={() => navigate(-1)} aria-label="Назад">
+            <ChevronLeft size={16} /> Назад
+          </button>
           <button className="btn btn-primary" onClick={load}>Повторить</button>
         </div>
       </div>
@@ -69,16 +77,21 @@ export default function ExerciseProgressPage() {
   );
 
   return (
-    <div className="page">
+    <div className="page workout-ctx">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px', fontSize: 14 }}>← Назад</button>
-        <h1 className="page-title" style={{ margin: 0 }}>Прогресс упражнений</h1>
+        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px', fontSize: 14 }} aria-label="Назад">
+          <ChevronLeft size={16} /> Назад
+        </button>
+        <div className="page-title-bar" style={{ margin: 0 }}>
+          <h1 className="page-title" style={{ margin: 0 }}>Прогресс упражнений</h1>
+        </div>
       </div>
 
       {weights.length === 0 ? (
         <div className="empty">
-          <div className="empty-icon">📊</div>
-          Нет данных
+          <div className="empty-icon"><BarChart3 size={48} /></div>
+          <div className="empty-text">Нет данных</div>
+          <div className="empty-hint">Завершите хотя бы одну тренировку для отслеживания прогресса</div>
         </div>
       ) : (
         ['A', 'B'].map((day) => {
@@ -91,7 +104,11 @@ export default function ExerciseProgressPage() {
                 {dayWeights.map((w) => (
                   <div key={w.exercise_id}>
                     <div className="list-item" style={{ cursor: 'pointer' }}
-                      onClick={() => showProgress(w.exercise_id)}>
+                      onClick={() => showProgress(w.exercise_id)}
+                      role="button"
+                      aria-expanded={selected === w.exercise_id}
+                      aria-label={`Показать прогресс ${w.name}`}
+                    >
                       <div className="list-item-content">
                         <div className="list-item-title">{w.name}</div>
                         <div className="list-item-meta">
@@ -100,7 +117,7 @@ export default function ExerciseProgressPage() {
                         </div>
                       </div>
                       <div className="list-item-right">
-                        <div className="amount">{w.current_weight} кг</div>
+                        <div className="amount" style={{ color: 'var(--workout-accent)' }}>{w.current_weight} кг</div>
                         <div className="stat-label">{selected === w.exercise_id ? '▲' : '▼'}</div>
                       </div>
                     </div>
@@ -112,8 +129,14 @@ export default function ExerciseProgressPage() {
                           <div style={{ padding: 12, color: 'var(--text-muted)', textAlign: 'center' }}>Загрузка...</div>
                         ) : progress ? (
                           <>
-                            <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 13 }}>
-                              <span>Тренд: {TREND_ICON[progress.trend]} {progress.trend}</span>
+                            <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 13, alignItems: 'center' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                Тренд: {(() => {
+                                  const Icon = TREND_ICON[progress.trend];
+                                  return Icon ? <Icon size={14} color={TREND_COLOR[progress.trend]} /> : '—';
+                                })()}
+                                <span style={{ color: TREND_COLOR[progress.trend] }}>{progress.trend}</span>
+                              </span>
                               <span>Статус: {progress.status}</span>
                             </div>
                             {progress.history_by_workout.length > 0 ? (

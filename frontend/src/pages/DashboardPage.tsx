@@ -1,13 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getMonthlySummary } from '../api/client';
-import type { MonthlySummary } from '../types';
+import { getMonthlySummary, createTransaction, getReferences } from '../api/client';
+import { DashboardSkeleton } from '../components/Skeleton';
+import { useToast } from '../components/Toast';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, TrendingUp, TrendingDown, AlertTriangle, Send } from 'lucide-react';
+import type { MonthlySummary, References } from '../types';
 
 const MONTH_NAMES = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 
 function formatMoney(value: number | null | undefined, currency = 'BYN'): string {
   return `${(value ?? 0).toFixed(2)} ${currency}`;
+}
+
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 6) return 'Доброй ночи';
+  if (h < 12) return 'Доброе утро';
+  if (h < 18) return 'Добрый день';
+  return 'Добрый вечер';
+}
+
+function getDaysLeft(): number {
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return lastDay - now.getDate();
 }
 
 export default function DashboardPage() {
@@ -17,8 +34,13 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showCategories, setShowCategories] = useState(false);
+  const [quickInput, setQuickInput] = useState('');
+  const [quickLoading, setQuickLoading] = useState(false);
+  const [refs, setRefs] = useState<References | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { showToast } = useToast();
 
   const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear();
 
@@ -41,12 +63,60 @@ export default function DashboardPage() {
   }, [month, year]);
 
   useEffect(load, [location.key, load]);
+  useEffect(() => { getReferences().then(setRefs).catch(() => {}); }, []);
 
-  if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  // R2: Quick input parser "500 продукты" or "100"
+  const handleQuickSubmit = async () => {
+    const text = quickInput.trim();
+    if (!text || quickLoading) return;
+
+    const parts = text.split(/\s+/);
+    const amount = parseFloat(parts[0]);
+    if (!amount || amount <= 0) {
+      showToast('Введите сумму, например: 50 продукты', 'error');
+      return;
+    }
+
+    // Try to match category
+    let category = '';
+    if (parts.length > 1) {
+      const catText = parts.slice(1).join(' ').toLowerCase();
+      const allCats = refs?.categories || [];
+      const match = allCats.find((c) => c.toLowerCase().startsWith(catText));
+      if (match) {
+        category = match;
+      } else {
+        showToast(`Категория "${parts.slice(1).join(' ')}" не найдена`, 'error');
+        return;
+      }
+    }
+
+    setQuickLoading(true);
+    try {
+      await createTransaction({
+        type: 'Расход',
+        account: refs?.accounts?.[0] || 'Наличные',
+        amount,
+        category: category || (refs?.categories?.[0] || 'Продукты'),
+        date: new Date().toISOString().split('T')[0],
+      });
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+      showToast(`-${amount} BYN${category ? ` · ${category}` : ''}`, 'success');
+      setQuickInput('');
+      load();
+    } catch {
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+      showToast('Ошибка сохранения', 'error');
+    } finally {
+      setQuickLoading(false);
+    }
+  };
+
+  if (loading) return <DashboardSkeleton />;
   if (error) return (
     <div className="page">
-      <div className="error-box">
-        <div className="error-icon">⚠️</div>
+      <div className="error-box" role="alert">
+        <AlertTriangle size={48} color="var(--danger)" />
         <div className="error-text">{error}</div>
         <button className="btn btn-primary" onClick={() => window.location.reload()}>
           Повторить
@@ -57,8 +127,14 @@ export default function DashboardPage() {
   if (!summary) return (
     <div className="page">
       <div className="empty">
-        <div className="empty-icon">📊</div>
-        <div>Нет данных</div>
+        <div className="empty-icon">
+          <TrendingUp size={48} />
+        </div>
+        <div className="empty-text">Нет данных за этот период</div>
+        <div className="empty-hint">Добавьте первую транзакцию</div>
+        <button className="empty-action" onClick={() => navigate('/add')}>
+          <Plus size={16} /> Добавить
+        </button>
       </div>
     </div>
   );
@@ -67,129 +143,174 @@ export default function DashboardPage() {
     .filter((c) => c.type === 'Расход' && c.spent > 0)
     .sort((a, b) => b.spent - a.spent);
 
+  const daysLeft = getDaysLeft();
+  const netBalance = (summary.total_income || 0) - (summary.total_expense || 0);
+
   return (
     <div className="page">
-      <h1 className="page-title">Финансы</h1>
+      {/* R8: Hero block with greeting */}
+      <div className="hero-balance">
+        <div className="hero-greeting">{getGreeting()}, Артур</div>
+        <div className="hero-amount" style={{ color: netBalance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+          {netBalance >= 0 ? '+' : ''}{formatMoney(netBalance)}
+        </div>
+        <div className="hero-label">
+          Баланс за {MONTH_NAMES[month].toLowerCase()}
+          {isCurrentMonth && daysLeft > 0 && ` · ${daysLeft} дн. до конца`}
+        </div>
+
+        {/* R6: Account chips */}
+        <div className="hero-accounts" role="list" aria-label="Счета">
+          {summary.accounts.map((acc) => (
+            <div className="hero-account-chip" key={acc.name} role="listitem">
+              <span>{acc.emoji || '💳'}</span>
+              <span className="amount">{formatMoney(acc.current, acc.currency)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Month selector */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 12, marginBottom: 12,
-      }}>
-        <button className="btn btn-ghost" onClick={prevMonth} style={{ padding: '4px 12px' }}>
-          ←
+      <div className="month-selector">
+        <button className="month-btn" onClick={prevMonth} aria-label="Предыдущий месяц">
+          <ChevronLeft size={18} />
         </button>
-        <span style={{ fontWeight: 600, fontSize: 15, minWidth: 130, textAlign: 'center' }}>
+        <span className="month-selector-label">
           {MONTH_NAMES[month]} {year}
         </span>
         <button
-          className="btn btn-ghost"
+          className="month-btn"
           onClick={nextMonth}
           disabled={isCurrentMonth}
-          style={{ padding: '4px 12px', opacity: isCurrentMonth ? 0.3 : 1 }}
+          aria-label="Следующий месяц"
         >
-          →
+          <ChevronRight size={18} />
         </button>
       </div>
 
-      {/* Summary */}
+      {/* R2: Quick input */}
+      {isCurrentMonth && (
+        <div className="quick-input-wrap">
+          <input
+            className="quick-input"
+            type="text"
+            inputMode="text"
+            placeholder="50 продукты..."
+            value={quickInput}
+            onChange={(e) => setQuickInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleQuickSubmit()}
+            aria-label="Быстрый ввод расхода"
+          />
+          <button
+            className="quick-input-btn"
+            onClick={handleQuickSubmit}
+            disabled={quickLoading || !quickInput.trim()}
+            aria-label="Добавить расход"
+          >
+            <Send size={20} />
+          </button>
+        </div>
+      )}
+
+      {/* Income / Expense summary */}
       <div className="grid-2">
-        <div className="card" style={{ cursor: 'pointer' }} onClick={() => navigate('/income')}>
-          <div className="card-title">Доходы</div>
+        <div className="card" style={{ cursor: 'pointer' }} onClick={() => navigate('/income')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/income'); }}} role="button" tabIndex={0} aria-label="Посмотреть доходы">
+          <div className="card-title">
+            <TrendingUp size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+            Доходы
+          </div>
           <div className="stat-value amount income">{formatMoney(summary.total_income)}</div>
         </div>
-        <div className="card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/expenses?month=${month}&year=${year}`)}>
-          <div className="card-title">Расходы</div>
+        <div className="card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/expenses?month=${month}&year=${year}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/expenses?month=${month}&year=${year}`); }}} role="button" tabIndex={0} aria-label="Посмотреть расходы">
+          <div className="card-title">
+            <TrendingDown size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+            Расходы
+          </div>
           <div className="stat-value amount expense">{formatMoney(summary.total_expense)}</div>
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-title">Баланс</div>
-        <div className="stat-value">{formatMoney(summary.balance)}</div>
-        <div className="stat-label">На счетах: {formatMoney(summary.total_on_accounts)}</div>
-      </div>
-
-      {/* Accounts */}
-      <div className="card">
-        <div className="card-title">Счета</div>
-        {summary.accounts.map((acc) => (
-          <div className="list-item" key={acc.name}>
-            <span className="list-item-icon">{acc.emoji || '💳'}</span>
-            <div className="list-item-content">
-              <div className="list-item-title">{acc.name}</div>
-              {acc.monthly_spent ? (
-                <div className="stat-label">Расход: {formatMoney(acc.monthly_spent)}</div>
-              ) : null}
-            </div>
-            <div className="list-item-right">
-              <span className="amount">{formatMoney(acc.current, acc.currency)}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* Budget warnings */}
-      {summary.over_budget.length > 0 && (
-        <div className="card" style={{ borderLeft: '3px solid var(--danger)' }}>
-          <div className="card-title" style={{ color: 'var(--danger)' }}>Бюджет превышен</div>
-          {summary.over_budget.map((cat) => (
-            <div key={cat.name} style={{ marginBottom: 4 }}>
-              {cat.emoji} {cat.name}: {cat.spent.toFixed(2)} / {cat.budget.toFixed(0)} BYN
-            </div>
-          ))}
+      {summary.over_budget.length > 0 && summary.over_budget.map((cat) => (
+        <div className="warning-card danger" key={cat.name} role="alert">
+          <span className="warning-icon">🚨</span>
+          <div>
+            <strong>{cat.emoji} {cat.name}</strong>: {cat.spent.toFixed(2)} / {cat.budget.toFixed(0)} BYN
+          </div>
         </div>
-      )}
-      {summary.near_limit.length > 0 && (
-        <div className="card" style={{ borderLeft: '3px solid var(--warning)' }}>
-          <div className="card-title" style={{ color: 'var(--warning)' }}>Близко к лимиту</div>
-          {summary.near_limit.map((cat) => (
-            <div key={cat.name} style={{ marginBottom: 4 }}>
-              {cat.emoji} {cat.name}: {cat.spent.toFixed(2)} / {cat.budget.toFixed(0)} BYN
-            </div>
-          ))}
+      ))}
+      {summary.near_limit.length > 0 && summary.near_limit.map((cat) => (
+        <div className="warning-card warning" key={cat.name} role="alert">
+          <span className="warning-icon">⚠️</span>
+          <div>
+            <strong>{cat.emoji} {cat.name}</strong>: {cat.spent.toFixed(2)} / {cat.budget.toFixed(0)} BYN
+          </div>
         </div>
-      )}
+      ))}
 
-      {/* Expense categories */}
+      {/* R6: Collapsible expense categories */}
       {expenseCategories.length > 0 && (
         <div className="card">
-          <div className="card-title">Расходы по категориям</div>
-          {expenseCategories.map((cat) => {
-            const pct = cat.budget > 0 ? Math.min(cat.progress * 100, 100) : 0;
-            const status = cat.progress >= 1 ? 'over' : cat.progress >= 0.8 ? 'warn' : 'ok';
-            return (
-              <div key={cat.name} style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span>{cat.emoji} {cat.name}</span>
-                  <span className="amount expense">
-                    {cat.spent.toFixed(2)}
-                    {cat.budget > 0 && <span className="stat-label"> / {cat.budget.toFixed(0)}</span>}
-                  </span>
-                </div>
-                {cat.budget > 0 && (
-                  <div className="progress-bar">
-                    <div className={`progress-fill ${status}`} style={{ width: `${pct}%` }} />
+          <button
+            className="section-toggle"
+            onClick={() => setShowCategories(!showCategories)}
+            aria-expanded={showCategories}
+            aria-controls="categories-list"
+          >
+            <span>Расходы по категориям ({expenseCategories.length})</span>
+            {showCategories ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+
+          {/* Always show top 3, expand for rest */}
+          <div id="categories-list">
+            {(showCategories ? expenseCategories : expenseCategories.slice(0, 3)).map((cat) => {
+              const pct = cat.budget > 0 ? Math.min(cat.progress * 100, 100) : 0;
+              const status = cat.progress >= 1 ? 'over' : cat.progress >= 0.8 ? 'warn' : 'ok';
+              return (
+                <div key={cat.name} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span>{cat.emoji} {cat.name}</span>
+                    <span className="amount expense">
+                      {cat.spent.toFixed(2)}
+                      {cat.budget > 0 && <span className="stat-label"> / {cat.budget.toFixed(0)}</span>}
+                    </span>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                  {cat.budget > 0 && (
+                    <div className="progress-bar" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${cat.name}: ${cat.spent.toFixed(0)} из ${cat.budget.toFixed(0)} BYN`}>
+                      <div className={`progress-fill ${status}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {!showCategories && expenseCategories.length > 3 && (
+            <button
+              style={{
+                background: 'none', border: 'none', color: 'var(--accent)',
+                fontSize: 13, cursor: 'pointer', padding: '4px 0', width: '100%', textAlign: 'center',
+              }}
+              onClick={() => setShowCategories(true)}
+            >
+              Ещё {expenseCategories.length - 3} категорий
+            </button>
+          )}
         </div>
       )}
 
-      {/* Quick links */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => navigate('/income')}>
-          💰 Доходы
+      {/* Quick actions */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13 }} onClick={() => navigate('/income')}>
+          <TrendingUp size={14} /> Доходы
         </button>
-        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => navigate(`/expenses?month=${month}&year=${year}`)}>
-          📋 Расходы
+        <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13 }} onClick={() => navigate(`/expenses?month=${month}&year=${year}`)}>
+          <TrendingDown size={14} /> Расходы
         </button>
       </div>
 
-      <button className="btn btn-primary btn-full" onClick={() => navigate('/add')}>
-        ➕ Добавить транзакцию
+      <button className="btn btn-primary btn-full" style={{ marginTop: 8, padding: '14px 0' }} onClick={() => navigate('/add')}>
+        <Plus size={18} /> Добавить транзакцию
       </button>
     </div>
   );

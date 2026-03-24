@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentWeights, getNextWorkout } from '../api/client';
+import { getCurrentWeights, getNextWorkoutFull } from '../api/client';
+import { ListPageSkeleton } from '../components/Skeleton';
+import { AlertTriangle, History, BarChart3, Dumbbell, Play } from 'lucide-react';
 import type { ExerciseWeight, NextWorkout } from '../types';
 
 export default function WorkoutsPage() {
@@ -9,12 +11,11 @@ export default function WorkoutsPage() {
   const [next, setNext] = useState<NextWorkout | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'next' | 'weights'>('next');
-
   const [error, setError] = useState('');
 
   const load = () => {
     setLoading(true); setError('');
-    Promise.all([getCurrentWeights(), getNextWorkout()])
+    Promise.all([getCurrentWeights(), getNextWorkoutFull()])
       .then(([w, n]) => { setWeights(w); setNext(n); })
       .catch((e) => setError(e.message || 'Ошибка загрузки'))
       .finally(() => setLoading(false));
@@ -22,11 +23,11 @@ export default function WorkoutsPage() {
 
   useEffect(load, []);
 
-  if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  if (loading) return <ListPageSkeleton />;
   if (error) return (
-    <div className="page">
-      <div className="error-box">
-        <div className="error-icon">⚠️</div>
+    <div className="page workout-ctx">
+      <div className="error-box" role="alert">
+        <AlertTriangle size={48} color="var(--danger)" />
         <div className="error-text">{error}</div>
         <button className="btn btn-primary" onClick={load}>Повторить</button>
       </div>
@@ -34,36 +35,44 @@ export default function WorkoutsPage() {
   );
 
   return (
-    <div className="page">
-      <h1 className="page-title">Тренировки</h1>
+    <div className="page workout-ctx">
+      <div className="page-title-bar">
+        <h1 className="page-title" style={{ margin: 0 }}>Тренировки</h1>
+      </div>
 
       {/* Quick links */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13 }}
           onClick={() => navigate('/workout-history')}>
-          📜 История
+          <History size={14} /> История
         </button>
         <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13 }}
           onClick={() => navigate('/exercise-progress')}>
-          📊 Прогресс
+          <BarChart3 size={14} /> Прогресс
         </button>
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         <button className={`btn ${tab === 'next' ? 'btn-primary' : 'btn-ghost'}`}
-          onClick={() => setTab('next')}>
+          onClick={() => setTab('next')}
+          aria-pressed={tab === 'next'}>
           Следующая
         </button>
         <button className={`btn ${tab === 'weights' ? 'btn-primary' : 'btn-ghost'}`}
-          onClick={() => setTab('weights')}>
+          onClick={() => setTab('weights')}
+          aria-pressed={tab === 'weights'}>
           Веса
         </button>
       </div>
 
       {/* Next Workout */}
       {tab === 'next' && !next && (
-        <div className="empty"><div className="empty-icon">🏋️</div>Нет данных о следующей тренировке</div>
+        <div className="empty">
+          <div className="empty-icon"><Dumbbell size={48} /></div>
+          <div className="empty-text">Нет данных о следующей тренировке</div>
+          <div className="empty-hint">Данные появятся автоматически</div>
+        </div>
       )}
       {tab === 'next' && next && (
         <>
@@ -83,13 +92,13 @@ export default function WorkoutsPage() {
           <div className="card" style={{ padding: 0 }}>
             {next.exercises.map((ex) => (
               <div className="list-item" key={ex.exercise_id} style={{ flexWrap: 'wrap' }}>
-                <span className="list-item-icon">🏋️</span>
+                <span className="list-item-icon" aria-hidden="true"><Dumbbell size={20} color="var(--workout-accent)" /></span>
                 <div className="list-item-content">
                   <div className="list-item-title">{ex.name}</div>
                   <div className="list-item-meta">{ex.category}</div>
                 </div>
                 <div className="list-item-right">
-                  <div className="amount">{ex.current_weight || 0} кг</div>
+                  <div className="amount" style={{ color: 'var(--workout-accent)' }}>{ex.current_weight || 0} кг</div>
                   <div className="stat-label">{ex.target_reps || ''}</div>
                 </div>
                 {ex.notes && (
@@ -103,14 +112,18 @@ export default function WorkoutsPage() {
 
           <button className="btn btn-primary" style={{ width: '100%', marginTop: 16, padding: '14px 0', fontSize: 16 }}
             onClick={() => navigate('/workout/session')}>
-            💪 Начать тренировку
+            <Play size={18} /> Начать тренировку
           </button>
         </>
       )}
 
       {/* Current Weights */}
       {tab === 'weights' && weights.length === 0 && (
-        <div className="empty"><div className="empty-icon">📊</div>Нет данных о весах</div>
+        <div className="empty">
+          <div className="empty-icon"><BarChart3 size={48} /></div>
+          <div className="empty-text">Нет данных о весах</div>
+          <div className="empty-hint">Завершите первую тренировку</div>
+        </div>
       )}
       {tab === 'weights' && weights.length > 0 && (
         <>
@@ -130,7 +143,7 @@ export default function WorkoutsPage() {
                         </div>
                       </div>
                       <div className="list-item-right">
-                        <div className="amount">{w.current_weight} кг</div>
+                        <div className="amount" style={{ color: 'var(--workout-accent)' }}>{w.current_weight} кг</div>
                       </div>
                     </div>
                   ))}

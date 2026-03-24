@@ -4,7 +4,7 @@ from datetime import datetime, date
 from typing import Optional, List
 from sqlalchemy import (
     BigInteger, Boolean, Date, DateTime, Float, ForeignKey,
-    Index, Integer, JSON, String, Text, UniqueConstraint, func
+    Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,8 +21,8 @@ class Account(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     currency: Mapped[str] = mapped_column(String(10), default="BYN")
-    balance: Mapped[float] = mapped_column(Float, default=0.0)
-    initial_balance: Mapped[float] = mapped_column(Float, default=0.0)
+    balance: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0)
+    initial_balance: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0)
     emoji: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -43,7 +43,7 @@ class Category(Base):
     name: Mapped[str] = mapped_column(String(100), index=True)
     type: Mapped[str] = mapped_column(String(20))  # Доход / Расход
     emoji: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
-    budget_limit: Mapped[float] = mapped_column(Float, default=0.0)
+    budget_limit: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -62,12 +62,12 @@ class Transaction(Base):
     type: Mapped[str] = mapped_column(String(30))  # Доход / Расход / Перевод / Обмен валюты
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
     category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id"), nullable=True)
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2))
     to_account_id: Mapped[Optional[int]] = mapped_column(ForeignKey("accounts.id"), nullable=True)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     hours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    exchange_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    amount_to: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    exchange_rate: Mapped[Optional[float]] = mapped_column(Numeric(12, 6), nullable=True)
+    amount_to: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(10), default="BYN")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     # Флаг синхронизации с Google Sheets (для экспорта)
@@ -192,7 +192,7 @@ class RecurringTransaction(Base):
     type: Mapped[str] = mapped_column(String(30))
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
     category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id"), nullable=True)
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(10), default="BYN")
     frequency: Mapped[str] = mapped_column(String(20))  # daily / weekly / monthly
     next_date: Mapped[date] = mapped_column(Date)

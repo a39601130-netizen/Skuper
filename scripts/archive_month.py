@@ -22,7 +22,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 import config
 
 
@@ -31,13 +31,13 @@ ARCHIVE_SHEET_NAME = "Архив"
 
 def connect_to_sheets():
     """Подключение к Google Sheets"""
-    scope = [
+    scopes = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(
-        config.GOOGLE_CREDENTIALS_FILE, scope
+    creds = Credentials.from_service_account_file(
+        config.GOOGLE_CREDENTIALS_FILE, scopes=scopes
     )
     client = gspread.authorize(creds)
     return client.open_by_key(config.GOOGLE_SHEETS_ID)

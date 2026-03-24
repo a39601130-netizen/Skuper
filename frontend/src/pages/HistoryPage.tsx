@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getTransactions, deleteTransaction } from '../api/client';
+import { ListPageSkeleton } from '../components/Skeleton';
+import { useToast } from '../components/Toast';
+import { AlertTriangle, Plus, Inbox } from 'lucide-react';
 import type { Transaction } from '../types';
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -10,10 +14,12 @@ const TYPE_EMOJI: Record<string, string> = {
 };
 
 export default function HistoryPage() {
+  const navigate = useNavigate();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<number | null>(null);
+  const { showToast } = useToast();
 
   const load = () => {
     setLoading(true); setError('');
@@ -32,19 +38,21 @@ export default function HistoryPage() {
     try {
       await deleteTransaction(txId);
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+      showToast('Транзакция удалена', 'success');
       load();
     } catch {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+      showToast('Ошибка удаления', 'error');
     } finally {
       setDeleting(null);
     }
   };
 
-  if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  if (loading) return <ListPageSkeleton />;
   if (error) return (
     <div className="page">
-      <div className="error-box">
-        <div className="error-icon">⚠️</div>
+      <div className="error-box" role="alert">
+        <AlertTriangle size={48} color="var(--danger)" />
         <div className="error-text">{error}</div>
         <button className="btn btn-primary" onClick={load}>Повторить</button>
       </div>
@@ -57,19 +65,23 @@ export default function HistoryPage() {
 
       {transactions.length === 0 ? (
         <div className="empty">
-          <div className="empty-icon">📭</div>
-          Нет транзакций
+          <div className="empty-icon"><Inbox size={48} /></div>
+          <div className="empty-text">Нет транзакций</div>
+          <div className="empty-hint">Добавьте первую запись о расходе или доходе</div>
+          <button className="empty-action" onClick={() => navigate('/add')}>
+            <Plus size={16} /> Добавить
+          </button>
         </div>
       ) : (
-        <div className="card" style={{ padding: 0 }}>
+        <div className="card" style={{ padding: 0 }} role="list" aria-label="Список транзакций">
           {transactions.map((tx) => {
             const emoji = TYPE_EMOJI[tx.type] || '📦';
             const isExpense = tx.type === 'Расход';
             const isIncome = tx.type === 'Доход';
             const isTransfer = tx.type === 'Перевод';
             return (
-              <div className="list-item" key={tx.id}>
-                <span className="list-item-icon">{emoji}</span>
+              <div className="list-item" key={tx.id} role="listitem">
+                <span className="list-item-icon" aria-hidden="true">{emoji}</span>
                 <div className="list-item-content">
                   <div className="list-item-title">
                     {tx.category || tx.type}
@@ -95,11 +107,7 @@ export default function HistoryPage() {
                     className="btn-delete"
                     onClick={() => handleDelete(tx.id)}
                     disabled={deleting === tx.id}
-                    style={{
-                      background: 'none', border: 'none', color: 'var(--danger)',
-                      fontSize: 12, cursor: 'pointer', padding: '4px 0',
-                      opacity: deleting === tx.id ? 0.5 : 1,
-                    }}
+                    aria-label={`Удалить транзакцию ${tx.category || tx.type}`}
                   >
                     {deleting === tx.id ? '...' : 'Удалить'}
                   </button>

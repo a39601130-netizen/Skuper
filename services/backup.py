@@ -13,8 +13,8 @@ from sqlalchemy.orm import selectinload
 import config
 from db.database import async_session
 from db.models import (
-    Transaction, Account, Category, Workout, WorkoutSet,
-    CurrentWeight, Exercise, SheetsSyncLog
+    Transaction, Workout, WorkoutSet,
+    CurrentWeight, SheetsSyncLog
 )
 from services.sheets import BaseSheetsService
 

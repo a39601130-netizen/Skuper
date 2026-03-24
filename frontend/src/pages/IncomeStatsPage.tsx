@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getIncomeStats } from '../api/client';
+import { DashboardSkeleton } from '../components/Skeleton';
+import { ChevronLeft, ChevronRight, AlertTriangle, TrendingUp } from 'lucide-react';
 import type { IncomeStats } from '../types';
 
 const MONTH_NAMES = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -37,20 +39,29 @@ export default function IncomeStatsPage() {
 
   useEffect(load, [load]);
 
-  if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  if (loading) return <DashboardSkeleton />;
   if (error) return (
     <div className="page">
-      <div className="error-box">
-        <div className="error-icon">⚠️</div>
+      <div className="error-box" role="alert">
+        <AlertTriangle size={48} color="var(--danger)" />
         <div className="error-text">{error}</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-ghost" onClick={() => navigate(-1)}>← Назад</button>
+          <button className="btn btn-ghost" onClick={() => navigate(-1)} aria-label="Назад">
+            <ChevronLeft size={16} /> Назад
+          </button>
           <button className="btn btn-primary" onClick={load}>Повторить</button>
         </div>
       </div>
     </div>
   );
-  if (!stats) return <div className="page"><div className="empty"><div className="empty-icon">📊</div>Нет данных</div></div>;
+  if (!stats) return (
+    <div className="page">
+      <div className="empty">
+        <div className="empty-icon"><TrendingUp size={48} /></div>
+        <div className="empty-text">Нет данных</div>
+      </div>
+    </div>
+  );
 
   const totalBasePay = stats.total_hours * stats.base_hourly_rate;
   const totalSalary = stats.days.reduce((s, d) => s + d.salary, 0);
@@ -61,28 +72,27 @@ export default function IncomeStatsPage() {
   return (
     <div className="page">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px', fontSize: 14 }}>← Назад</button>
+        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px', fontSize: 14 }} aria-label="Назад">
+          <ChevronLeft size={16} /> Назад
+        </button>
         <h1 className="page-title" style={{ margin: 0 }}>Доходы</h1>
       </div>
 
       {/* Month selector */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 12, marginBottom: 12,
-      }}>
-        <button className="btn btn-ghost" onClick={prevMonth} style={{ padding: '4px 12px' }}>
-          ←
+      <div className="month-selector">
+        <button className="month-btn" onClick={prevMonth} aria-label="Предыдущий месяц">
+          <ChevronLeft size={18} />
         </button>
-        <span style={{ fontWeight: 600, fontSize: 15, minWidth: 130, textAlign: 'center' }}>
+        <span className="month-selector-label">
           {MONTH_NAMES[month]} {year}
         </span>
         <button
-          className="btn btn-ghost"
+          className="month-btn"
           onClick={nextMonth}
           disabled={isCurrentMonth}
-          style={{ padding: '4px 12px', opacity: isCurrentMonth ? 0.3 : 1 }}
+          aria-label="Следующий месяц"
         >
-          →
+          <ChevronRight size={18} />
         </button>
       </div>
 
@@ -111,7 +121,9 @@ export default function IncomeStatsPage() {
 
       {/* Days */}
       {stats.days.length === 0 ? (
-        <div className="empty">Нет доходов за этот месяц</div>
+        <div className="empty">
+          <div className="empty-text">Нет доходов за этот месяц</div>
+        </div>
       ) : (
         <div className="card" style={{ padding: 0 }}>
           {stats.days.map((day) => {

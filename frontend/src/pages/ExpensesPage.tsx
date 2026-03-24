@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { getMonthlySummary, getTransactions } from '../api/client';
+import { DashboardSkeleton } from '../components/Skeleton';
+import { ChevronLeft, AlertTriangle, TrendingDown } from 'lucide-react';
 import type { MonthlySummary, Transaction } from '../types';
 
 const MONTH_NAMES = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -72,26 +74,31 @@ export default function ExpensesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  if (loading) return <DashboardSkeleton />;
   if (error) return (
     <div className="page">
-      <div className="error-box">
-        <div className="error-icon">!</div>
+      <div className="error-box" role="alert">
+        <AlertTriangle size={48} color="var(--danger)" />
         <div className="error-text">{error}</div>
         <button className="btn btn-primary" onClick={load}>Повторить</button>
       </div>
     </div>
   );
-  if (!summary) return <div className="page"><div className="empty"><div className="empty-icon">📊</div><div>Нет данных</div></div></div>;
+  if (!summary) return (
+    <div className="page">
+      <div className="empty">
+        <div className="empty-icon"><TrendingDown size={48} /></div>
+        <div className="empty-text">Нет данных</div>
+      </div>
+    </div>
+  );
 
-  // Expense categories sorted by spent desc
   const expenseCategories = summary.categories
     .filter((c) => c.type === 'Расход' && c.spent > 0)
     .sort((a, b) => b.spent - a.spent);
 
   const totalExpense = summary.total_expense;
 
-  // Previous month comparison map
   const prevMap: Record<string, number> = {};
   if (prevSummary) {
     prevSummary.categories
@@ -100,7 +107,6 @@ export default function ExpensesPage() {
   }
   const prevTotalExpense = prevSummary?.total_expense ?? 0;
 
-  // Pie chart data: group <3% into "Прочее"
   const threshold = totalExpense * 0.03;
   const mainCats: PieData[] = [];
   let otherSum = 0;
@@ -125,28 +131,25 @@ export default function ExpensesPage() {
     });
   }
 
-  // Top 3 transactions
   const top3 = [...transactions].sort((a, b) => b.amount - a.amount).slice(0, 3);
 
-  // Comparison badge
   function compBadge(current: number, previous: number) {
     if (!previous || previous === 0) return null;
     const diff = ((current - previous) / previous) * 100;
     if (Math.abs(diff) < 1) return null;
     const up = diff > 0;
     return (
-      <span className={`comp-badge ${up ? 'comp-up' : 'comp-down'}`}>
-        {up ? '↑' : '↓'}{Math.abs(diff).toFixed(0)}%
+      <span className={`comp-badge ${up ? 'comp-up' : 'comp-down'}`}
+        aria-label={`${up ? 'рост' : 'снижение'} на ${Math.abs(diff).toFixed(0)}%`}>
+        <span aria-hidden="true">{up ? '↑' : '↓'}</span>{Math.abs(diff).toFixed(0)}%
       </span>
     );
   }
 
-  // Transactions for a category
   function getCatTransactions(catName: string) {
     return transactions.filter((t) => t.category === catName);
   }
 
-  // Custom tooltip
   function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: PieData }> }) {
     if (!active || !payload?.length) return null;
     const d = payload[0].payload;
@@ -160,7 +163,9 @@ export default function ExpensesPage() {
   return (
     <div className="page">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px' }}>←</button>
+        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px' }} aria-label="Назад">
+          <ChevronLeft size={16} />
+        </button>
         <h1 className="page-title" style={{ margin: 0 }}>
           Расходы — {MONTH_NAMES[month]} {year}
         </h1>
@@ -186,7 +191,7 @@ export default function ExpensesPage() {
           <div className="card-title">Топ-3 расходов</div>
           {top3.map((tx, i) => (
             <div className="list-item" key={tx.id} style={{ padding: '8px 0' }}>
-              <span className="list-item-icon" style={{ fontSize: 18, width: 28 }}>
+              <span className="list-item-icon" style={{ fontSize: 18, width: 28 }} aria-hidden="true">
                 {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
               </span>
               <div className="list-item-content">
@@ -216,9 +221,14 @@ export default function ExpensesPage() {
               <div
                 className="expense-cat-row"
                 onClick={() => setExpandedCat(isExpanded ? null : cat.name)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedCat(isExpanded ? null : cat.name); }}}
+                role="button"
+                tabIndex={0}
+                aria-expanded={isExpanded}
+                aria-label={`${cat.emoji} ${cat.name}: ${cat.spent.toFixed(2)} BYN${cat.budget > 0 ? ` из ${cat.budget.toFixed(0)}` : ''}`}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: 18 }}>{cat.emoji}</span>
+                  <span style={{ fontSize: 18 }} aria-hidden="true">{cat.emoji}</span>
                   <span className="list-item-title" style={{ flex: 1 }}>{cat.name}</span>
                   {compBadge(cat.spent, prevSpent)}
                 </div>
@@ -229,17 +239,15 @@ export default function ExpensesPage() {
                   </span>
                   <div className="stat-label">{(totalExpense > 0 ? (cat.spent / totalExpense) * 100 : 0).toFixed(1)}%</div>
                 </div>
-                <span className="expand-arrow" style={{ transform: isExpanded ? 'rotate(90deg)' : undefined }}>›</span>
+                <span className="expand-arrow" aria-hidden="true" style={{ transform: isExpanded ? 'rotate(90deg)' : undefined }}>›</span>
               </div>
 
-              {/* Progress bar */}
               {cat.budget > 0 && (
                 <div className="progress-bar" style={{ marginTop: 4 }}>
                   <div className={`progress-fill ${status}`} style={{ width: `${pct}%` }} />
                 </div>
               )}
 
-              {/* Expanded transactions */}
               {isExpanded && catTxs.length > 0 && (
                 <div className="cat-transactions">
                   {catTxs.map((tx) => (
@@ -282,7 +290,6 @@ export default function ExpensesPage() {
                   const cat = mainCats[idx];
                   if (cat.name !== 'Прочее') {
                     setExpandedCat(expandedCat === cat.name ? null : cat.name);
-                    // Scroll to category
                     setTimeout(() => {
                       document.querySelector('.expense-cat-row')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }, 100);
@@ -296,11 +303,10 @@ export default function ExpensesPage() {
               <Tooltip content={<PieTooltip />} />
             </PieChart>
           </ResponsiveContainer>
-          {/* Legend */}
           <div className="pie-legend">
             {mainCats.map((d, i) => (
               <div className="pie-legend-item" key={d.name}>
-                <span className="pie-legend-dot" style={{ background: COLORS[i % COLORS.length] }} />
+                <span className="pie-legend-dot" style={{ background: COLORS[i % COLORS.length] }} aria-hidden="true" />
                 <span>{d.emoji} {d.name}</span>
                 <span className="stat-label" style={{ marginLeft: 'auto' }}>{d.pct.toFixed(1)}%</span>
               </div>

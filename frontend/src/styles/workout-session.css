@@ -438,6 +438,12 @@
   background: rgba(239, 68, 68, 0.1);
 }
 
+.ws-rpe-btn.selected {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 2px var(--accent);
+  background: rgba(59, 130, 246, 0.15);
+}
+
 .ws-rpe-num {
   font-size: 22px;
   font-weight: 700;

@@ -8,7 +8,7 @@ from utils.timezone import today_minsk
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, BeforeValidator, field_validator
+from pydantic import BaseModel, BeforeValidator, field_validator, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
@@ -85,6 +85,17 @@ class TransactionCreate(BaseModel):
             raise ValueError("Дата не может быть в будущем")
         return v
 
+    @model_validator(mode='after')
+    def validate_transfer_and_exchange(self):
+        if self.type in ("Перевод", "Обмен валюты") and not self.to_account:
+            raise ValueError("Для перевода/обмена нужно указать счёт назначения")
+        if self.type == "Обмен валюты":
+            if not self.exchange_rate:
+                raise ValueError("Для обмена валюты нужен курс")
+            if not self.amount_to:
+                raise ValueError("Для обмена валюты нужна сумма зачисления")
+        return self
+
 
 @router.get("")
 async def list_transactions(
@@ -141,7 +152,7 @@ async def create_transaction(
             "amount_to": tx.amount_to,
             "currency": tx.currency or "BYN",
         }
-        asyncio.get_event_loop().run_in_executor(
+        asyncio.get_running_loop().run_in_executor(
             None, _sync_tx_to_sheets, tx_data
         )
         return {"status": "ok", "id": tx.id}
@@ -159,7 +170,7 @@ async def remove_transaction(
     if not success:
         raise HTTPException(status_code=404, detail="Transaction not found")
     # Background delete from Google Sheets
-    asyncio.get_event_loop().run_in_executor(
+    asyncio.get_running_loop().run_in_executor(
         None, _delete_tx_from_sheets, tx_id
     )
     return {"status": "ok"}

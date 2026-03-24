@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getWorkoutHistory, deleteWorkout2 } from '../api/client';
+import { getWorkoutHistory, deleteWorkout } from '../api/client';
+import { ListPageSkeleton } from '../components/Skeleton';
+import { useToast } from '../components/Toast';
+import { ChevronLeft, AlertTriangle, Dumbbell } from 'lucide-react';
 import type { WorkoutHistory } from '../types';
 
 export default function WorkoutHistoryPage() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [history, setHistory] = useState<WorkoutHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -22,25 +26,29 @@ export default function WorkoutHistoryPage() {
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteWorkout2(id);
+      await deleteWorkout(id);
       setHistory((prev) => prev.filter((w) => w.id !== id));
       setConfirmId(null);
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+      showToast('Тренировка удалена', 'success');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Ошибка удаления';
       setError(msg);
       setConfirmId(null);
+      showToast(msg, 'error');
     }
   };
 
-  if (loading) return <div className="page"><div className="loading">Загрузка...</div></div>;
+  if (loading) return <ListPageSkeleton />;
   if (error) return (
-    <div className="page">
-      <div className="error-box">
-        <div className="error-icon">⚠️</div>
+    <div className="page workout-ctx">
+      <div className="error-box" role="alert">
+        <AlertTriangle size={48} color="var(--danger)" />
         <div className="error-text">{error}</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-ghost" onClick={() => navigate(-1)}>← Назад</button>
+          <button className="btn btn-ghost" onClick={() => navigate(-1)} aria-label="Назад">
+            <ChevronLeft size={16} /> Назад
+          </button>
           <button className="btn btn-primary" onClick={load}>Повторить</button>
         </div>
       </div>
@@ -48,16 +56,24 @@ export default function WorkoutHistoryPage() {
   );
 
   return (
-    <div className="page">
+    <div className="page workout-ctx">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px', fontSize: 14 }}>← Назад</button>
-        <h1 className="page-title" style={{ margin: 0 }}>История тренировок</h1>
+        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ padding: '4px 12px', fontSize: 14 }} aria-label="Назад">
+          <ChevronLeft size={16} /> Назад
+        </button>
+        <div className="page-title-bar" style={{ margin: 0 }}>
+          <h1 className="page-title" style={{ margin: 0 }}>История тренировок</h1>
+        </div>
       </div>
 
       {history.length === 0 ? (
         <div className="empty">
-          <div className="empty-icon">🏋️</div>
-          Нет записей о тренировках
+          <div className="empty-icon"><Dumbbell size={48} /></div>
+          <div className="empty-text">Нет записей о тренировках</div>
+          <div className="empty-hint">Начните первую тренировку и она появится здесь</div>
+          <button className="empty-action" onClick={() => navigate('/workout/session')} style={{ background: 'var(--workout-accent)' }}>
+            Начать тренировку
+          </button>
         </div>
       ) : (
         <div className="card" style={{ padding: 0 }}>
@@ -77,6 +93,7 @@ export default function WorkoutHistoryPage() {
                           background: 'var(--danger)', color: 'white', border: 'none',
                           borderRadius: 6, padding: '2px 8px', fontSize: 12, cursor: 'pointer',
                         }}
+                        aria-label="Подтвердить удаление"
                       >Да</button>
                       <button
                         onClick={() => setConfirmId(null)}
@@ -84,6 +101,7 @@ export default function WorkoutHistoryPage() {
                           background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: 'none',
                           borderRadius: 6, padding: '2px 8px', fontSize: 12, cursor: 'pointer',
                         }}
+                        aria-label="Отменить удаление"
                       >Нет</button>
                     </div>
                   ) : (
@@ -93,7 +111,7 @@ export default function WorkoutHistoryPage() {
                         background: 'none', border: 'none', color: 'var(--text-muted)',
                         cursor: 'pointer', padding: '0 4px', fontSize: 16, lineHeight: 1,
                       }}
-                      title="Удалить"
+                      aria-label={`Удалить тренировку за ${w.date}`}
                     >✕</button>
                   )}
                 </div>

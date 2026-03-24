@@ -2,7 +2,7 @@
 Сервис для работы с Google Sheets
 """
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 from datetime import datetime
 from utils.timezone import now_minsk
 from typing import Optional, Dict, List, Any
@@ -83,13 +83,13 @@ class BaseSheetsService:
     def _connect(self):
         """Подключение к Google Sheets"""
         try:
-            scope = [
+            scopes = [
                 "https://spreadsheets.google.com/feeds",
                 "https://www.googleapis.com/auth/spreadsheets",
                 "https://www.googleapis.com/auth/drive"
             ]
-            creds = ServiceAccountCredentials.from_json_keyfile_name(
-                config.GOOGLE_CREDENTIALS_FILE, scope
+            creds = Credentials.from_service_account_file(
+                config.GOOGLE_CREDENTIALS_FILE, scopes=scopes
             )
             self.client = gspread.authorize(creds)
             self.spreadsheet = self.client.open_by_key(self.spreadsheet_id)
@@ -201,14 +201,14 @@ class GoogleSheetsService:
 
     def _connect(self):
         """Подключение к Google Sheets"""
-        scope = [
+        scopes = [
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
 
-        creds = ServiceAccountCredentials.from_json_keyfile_name(
-            config.GOOGLE_CREDENTIALS_FILE, scope
+        creds = Credentials.from_service_account_file(
+            config.GOOGLE_CREDENTIALS_FILE, scopes=scopes
         )
         self.client = gspread.authorize(creds)
         self.spreadsheet = self.client.open_by_key(config.GOOGLE_SHEETS_ID)

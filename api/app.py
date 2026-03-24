@@ -1,8 +1,10 @@
 """FastAPI application with SPA fallback."""
 
 import os
+import time
 from pathlib import Path
-from fastapi import FastAPI
+from collections import defaultdict
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -10,13 +12,19 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from api.routers import health, transactions, accounts, categories, stats, workouts, exercises, advisor, recurring, sync
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "production") == "production"
+
+# Simple in-memory rate limiter
+_rate_limit_store: dict[str, list[float]] = defaultdict(list)
+RATE_LIMIT = 100  # requests
+RATE_WINDOW = 60  # seconds
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Budget Bot Mini App",
-        docs_url="/api/docs",
-        openapi_url="/api/openapi.json",
+        docs_url=None if IS_PRODUCTION else "/api/docs",
+        openapi_url=None if IS_PRODUCTION else "/api/openapi.json",
     )
 
     app.add_middleware(
@@ -30,6 +38,25 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "X-Telegram-Init-Data"],
     )
+
+    # Rate limiting middleware
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next):
+        if request.url.path.startswith("/api/"):
+            client_ip = request.client.host if request.client else "unknown"
+            now = time.time()
+            # Clean old entries
+            _rate_limit_store[client_ip] = [
+                t for t in _rate_limit_store[client_ip] if now - t < RATE_WINDOW
+            ]
+            if len(_rate_limit_store[client_ip]) >= RATE_LIMIT:
+                return JSONResponse(
+                    {"detail": "Too many requests"},
+                    status_code=429,
+                    headers={"Retry-After": str(RATE_WINDOW)},
+                )
+            _rate_limit_store[client_ip].append(now)
+        return await call_next(request)
 
     # API роутеры
     app.include_router(health.router)

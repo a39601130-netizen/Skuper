@@ -2,7 +2,7 @@
 
 import calendar
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from utils.timezone import today_minsk
 from typing import Optional, List, Dict, Any
@@ -75,6 +75,8 @@ async def add_transaction(
     account = await get_account_by_name(db, account_name)
     if not account:
         raise ValueError(f"Account not found: {account_name}")
+    if not account.is_active:
+        raise ValueError(f"Account is inactive: {account_name}")
 
     category_id = None
     if category_name:
@@ -89,7 +91,12 @@ async def add_transaction(
     if to_account_name:
         to_acc = await get_account_by_name(db, to_account_name)
         if to_acc:
+            if not to_acc.is_active:
+                raise ValueError(f"Target account is inactive: {to_account_name}")
             to_account_id = to_acc.id
+
+    if trans_type == "Перевод" and not to_account_id:
+        raise ValueError("Для перевода нужно указать счёт назначения")
 
     tx = Transaction(
         date=trans_date,
@@ -422,7 +429,6 @@ async def get_income_by_days(
 
 
 async def get_weekly_summary(db: AsyncSession, days_back: int = 7) -> Dict[str, Any]:
-    from datetime import timedelta
     today = today_minsk()
     from_date = today - timedelta(days=days_back)
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createTransaction, getReferences } from '../api/client';
+import { useToast } from '../components/Toast';
+import { ChevronLeft, AlertTriangle, Check } from 'lucide-react';
 import type { References, TransactionCreate } from '../types';
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -23,6 +25,7 @@ function dayLabel(d: Date): string {
 
 export default function AddTransactionPage() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [refs, setRefs] = useState<References | null>(null);
   const [step, setStep] = useState<Step>('type');
   const [data, setData] = useState<Partial<TransactionCreate>>({ currency: 'BYN' });
@@ -38,7 +41,6 @@ export default function AddTransactionPage() {
   const goBack = () => {
     const idx = stepOrder.indexOf(step);
     if (idx <= 0) { navigate('/'); return; }
-    // Find previous valid step
     for (let i = idx - 1; i >= 0; i--) {
       const prev = stepOrder[i];
       if (prev === 'to_account' && data.type !== 'Перевод' && data.type !== 'Обмен валюты') continue;
@@ -60,102 +62,62 @@ export default function AddTransactionPage() {
     setCustomDay('');
   };
 
-  // --- Type ---
-  const selectType = (type: string) => {
-    haptic();
-    setData({ ...data, type });
-    setStep('date');
-  };
+  const selectType = (type: string) => { haptic(); setData({ ...data, type }); setStep('date'); };
 
-  // --- Date ---
-  const selectDate = (dateStr: string) => {
-    haptic();
-    setData({ ...data, date: dateStr });
-    setStep('account');
-  };
+  const selectDate = (dateStr: string) => { haptic(); setData({ ...data, date: dateStr }); setStep('account'); };
 
   const submitCustomDate = () => {
     const day = parseInt(customDay);
-    if (!day || day < 1 || day > 31) return;
+    if (!day || day < 1) return;
     const now = new Date();
+    const maxDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    if (day > maxDay) return;
     const d = new Date(now.getFullYear(), now.getMonth(), day);
-    // Проверяем, что дата валидна (например, 31 февраля станет 3 марта)
-    if (d.getMonth() !== now.getMonth()) return;
     selectDate(formatDate(d));
   };
 
-  // --- Account ---
   const selectAccount = (account: string) => {
     haptic();
-    const next = { ...data, account };
-    setData(next);
-    if (data.type === 'Перевод') {
-      setStep('to_account');
-    } else if (data.type === 'Обмен валюты') {
+    setData({ ...data, account });
+    if (data.type === 'Перевод' || data.type === 'Обмен валюты') {
       setStep('to_account');
     } else {
       setStep('category');
     }
   };
 
-  // --- To Account ---
   const selectToAccount = (to_account: string) => {
     haptic();
     setData({ ...data, to_account });
-    if (data.type === 'Обмен валюты') {
-      setStep('currency');
-    } else {
-      setStep('amount'); // Перевод — без категории
-    }
+    setStep(data.type === 'Обмен валюты' ? 'currency' : 'amount');
   };
 
-  // --- Category ---
-  const selectCategory = (category: string) => {
-    haptic();
-    setData({ ...data, category });
-    setStep('amount');
-  };
+  const selectCategory = (category: string) => { haptic(); setData({ ...data, category }); setStep('amount'); };
 
-  // --- Currency (for exchange) ---
-  const selectCurrency = (currency: string) => {
-    haptic();
-    setData({ ...data, currency });
-    setStep('amount');
-  };
+  const selectCurrency = (currency: string) => { haptic(); setData({ ...data, currency }); setStep('amount'); };
 
-  // --- After amount ---
   const afterAmount = () => {
-    if (data.type === 'Обмен валюты') {
-      setStep('exchange_rate');
-    } else if (data.type === 'Доход' && (data.category === 'Зарплата' || data.category === 'Чаевые')) {
-      setStep('hours');
-    } else {
-      setStep('comment');
-    }
+    if (data.type === 'Обмен валюты') setStep('exchange_rate');
+    else if (data.type === 'Доход' && (data.category === 'Зарплата' || data.category === 'Чаевые')) setStep('hours');
+    else setStep('comment');
   };
 
-  // --- After exchange rate ---
-  const afterExchangeRate = () => {
-    setStep('comment');
-  };
+  const afterExchangeRate = () => setStep('comment');
+  const afterHours = () => setStep('comment');
 
-  // --- After hours ---
-  const afterHours = () => {
-    setStep('comment');
-  };
-
-  // --- Submit ---
   const handleSubmit = async () => {
-    if (!data.type || !data.account || !data.amount) return;
+    if (!data.type || !data.account || !data.amount || loading) return;
     setLoading(true);
     setError('');
     try {
       await createTransaction(data as TransactionCreate);
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+      showToast('Транзакция сохранена', 'success');
       navigate('/');
     } catch (e) {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
       setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+      showToast('Ошибка сохранения', 'error');
     } finally {
       setLoading(false);
     }
@@ -169,15 +131,33 @@ export default function AddTransactionPage() {
     ? (refs?.income_categories || [])
     : (refs?.categories || []);
 
-  // Compute exchange amount
   const exchangeAmount = (data.amount && data.exchange_rate)
     ? (data.amount * data.exchange_rate).toFixed(2)
     : null;
 
+  // Step progress indicator
+  const totalSteps = stepOrder.filter((s) => {
+    if (s === 'to_account' && data.type !== 'Перевод' && data.type !== 'Обмен валюты') return false;
+    if (s === 'category' && data.type === 'Перевод') return false;
+    if (s === 'currency' && data.type !== 'Обмен валюты') return false;
+    if (s === 'exchange_rate' && data.type !== 'Обмен валюты') return false;
+    if (s === 'hours' && !(data.type === 'Доход' && (data.category === 'Зарплата' || data.category === 'Чаевые'))) return false;
+    return true;
+  }).length;
+  const currentStepIdx = stepOrder.slice(0, stepOrder.indexOf(step) + 1).filter((s) => {
+    if (s === 'to_account' && data.type !== 'Перевод' && data.type !== 'Обмен валюты') return false;
+    if (s === 'category' && data.type === 'Перевод') return false;
+    if (s === 'currency' && data.type !== 'Обмен валюты') return false;
+    if (s === 'exchange_rate' && data.type !== 'Обмен валюты') return false;
+    if (s === 'hours' && !(data.type === 'Доход' && (data.category === 'Зарплата' || data.category === 'Чаевые'))) return false;
+    return true;
+  }).length;
+  const progressPct = totalSteps > 0 ? (currentStepIdx / totalSteps) * 100 : 0;
+
   if (error && !refs) return (
     <div className="page">
-      <div className="error-box">
-        <div className="error-icon">⚠️</div>
+      <div className="error-box" role="alert">
+        <AlertTriangle size={48} color="var(--danger)" />
         <div className="error-text">{error}</div>
         <button className="btn btn-primary" onClick={() => window.location.reload()}>Повторить</button>
       </div>
@@ -186,18 +166,26 @@ export default function AddTransactionPage() {
 
   return (
     <div className="page">
+      {/* R7: Progress bar at top */}
+      <div className="progress-bar" style={{ marginBottom: 12, height: 4 }}
+        role="progressbar" aria-valuenow={Math.round(progressPct)} aria-valuemin={0} aria-valuemax={100}
+        aria-label={`Шаг ${currentStepIdx} из ${totalSteps}`}>
+        <div className="progress-fill ok" style={{ width: `${progressPct}%`, background: 'linear-gradient(90deg, var(--accent), var(--success))' }} />
+      </div>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         {step !== 'type' && (
-          <button className="btn btn-ghost" onClick={goBack} style={{ padding: '4px 12px', fontSize: 14 }}>
-            ← Назад
+          <button className="btn btn-ghost" onClick={goBack} style={{ padding: '4px 12px', fontSize: 14 }} aria-label="Назад">
+            <ChevronLeft size={16} /> Назад
           </button>
         )}
         <h1 className="page-title" style={{ margin: 0 }}>Новая транзакция</h1>
       </div>
 
       {error && (
-        <div className="card" style={{ borderLeft: '3px solid var(--danger)', marginBottom: 12 }}>
-          <div style={{ color: 'var(--danger)', fontSize: 14 }}>⚠️ {error}</div>
+        <div className="warning-card danger" role="alert" style={{ marginBottom: 12 }}>
+          <AlertTriangle size={16} />
+          <span>{error}</span>
         </div>
       )}
 
@@ -237,6 +225,7 @@ export default function AddTransactionPage() {
                 value={customDay}
                 onChange={(e) => setCustomDay(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && submitCustomDate()}
+                aria-label="Число месяца"
                 style={{
                   flex: 1, padding: '10px', fontSize: 15,
                   background: 'var(--bg-secondary)', color: 'var(--text-primary)',
@@ -314,6 +303,7 @@ export default function AddTransactionPage() {
             inputMode="decimal"
             autoFocus
             placeholder="0.00"
+            aria-label="Сумма"
             style={{
               width: '100%', padding: '12px', fontSize: 24, fontWeight: 700,
               background: 'var(--bg-secondary)', color: 'var(--text-primary)',
@@ -341,6 +331,7 @@ export default function AddTransactionPage() {
             inputMode="decimal"
             autoFocus
             placeholder="Курс обмена"
+            aria-label="Курс обмена"
             style={{
               width: '100%', padding: '12px', fontSize: 24, fontWeight: 700,
               background: 'var(--bg-secondary)', color: 'var(--text-primary)',
@@ -377,6 +368,7 @@ export default function AddTransactionPage() {
             inputMode="decimal"
             autoFocus
             placeholder="Сколько часов"
+            aria-label="Часы работы"
             style={{
               width: '100%', padding: '12px', fontSize: 24, fontWeight: 700,
               background: 'var(--bg-secondary)', color: 'var(--text-primary)',
@@ -406,6 +398,7 @@ export default function AddTransactionPage() {
             type="text"
             autoFocus
             placeholder="Описание..."
+            aria-label="Комментарий к транзакции"
             style={{
               width: '100%', padding: '12px', fontSize: 16,
               background: 'var(--bg-secondary)', color: 'var(--text-primary)',
@@ -451,6 +444,7 @@ export default function AddTransactionPage() {
             </button>
             <button className="btn btn-primary" style={{ flex: 1 }}
               onClick={handleSubmit} disabled={loading}>
+              <Check size={16} />
               {loading ? 'Сохранение...' : 'Сохранить'}
             </button>
           </div>
