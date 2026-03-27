@@ -52,13 +52,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 // --- Transactions ---
 export const getTransactions = (
   limit = 20,
-  filters?: { date_from?: string; date_to?: string; type?: string; category?: string },
+  filters?: { date_from?: string; date_to?: string; type?: string; category?: string; account?: string },
 ) => {
   const params = new URLSearchParams({ limit: String(limit) });
   if (filters?.date_from) params.set('date_from', filters.date_from);
   if (filters?.date_to) params.set('date_to', filters.date_to);
   if (filters?.type) params.set('type', filters.type);
   if (filters?.category) params.set('category', filters.category);
+  if (filters?.account) params.set('account', filters.account);
   return request<Transaction[]>(`/transactions?${params}`);
 };
 

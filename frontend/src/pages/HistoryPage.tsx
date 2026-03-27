@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTransactions, deleteTransaction } from '../api/client';
 import { ListPageSkeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
-import { AlertTriangle, Plus, Inbox } from 'lucide-react';
+import { AlertTriangle, Plus, Inbox, X } from 'lucide-react';
 import type { Transaction } from '../types';
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -15,6 +15,8 @@ const TYPE_EMOJI: Record<string, string> = {
 
 export default function HistoryPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const accountFilter = searchParams.get('account') || '';
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,13 +25,14 @@ export default function HistoryPage() {
 
   const load = () => {
     setLoading(true); setError('');
-    getTransactions(50)
+    const filters = accountFilter ? { account: accountFilter } : undefined;
+    getTransactions(50, filters)
       .then(setTransactions)
       .catch((e) => setError(e.message || 'Ошибка загрузки'))
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, []);
+  useEffect(load, [accountFilter]);
 
   const handleDelete = async (txId: number) => {
     if (deleting) return;
@@ -62,6 +65,17 @@ export default function HistoryPage() {
   return (
     <div className="page">
       <h1 className="page-title">История</h1>
+
+      {accountFilter && (
+        <div className="filter-chip-bar">
+          <span className="filter-chip">
+            {accountFilter}
+            <button className="filter-chip-remove" onClick={() => setSearchParams({})} aria-label="Сбросить фильтр">
+              <X size={14} />
+            </button>
+          </span>
+        </div>
+      )}
 
       {transactions.length === 0 ? (
         <div className="empty">

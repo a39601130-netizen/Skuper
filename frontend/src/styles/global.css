@@ -667,6 +667,40 @@ input[type="number"]:focus {
   font-size: 13px;
 }
 
+/* Filter chip bar */
+.filter-chip-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.filter-chip-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  opacity: 0.8;
+}
+
+.filter-chip-remove:hover {
+  opacity: 1;
+}
+
 /* R6: Collapsible section */
 .section-toggle {
   display: flex;

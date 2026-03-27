@@ -63,7 +63,8 @@ async def next_workout(
 ):
     next_day = await determine_next_day(db)
     phase = await get_current_week_and_phase(db)
-    exercises = await get_exercises(db, day=next_day)
+    all_exercises = await get_exercises(db, day=next_day)
+    exercises = [ex for ex in all_exercises if ex.get("order", 0) < 100]
     weights = await get_current_weights(db)
 
     # Добавляем историю последних подходов к каждому упражнению

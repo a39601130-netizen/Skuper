@@ -16,7 +16,10 @@ const CATEGORY_EMOJI: Record<string, string> = {
 type Step = 'type' | 'date' | 'account' | 'to_account' | 'category' | 'currency' | 'amount' | 'exchange_rate' | 'hours' | 'comment' | 'confirm';
 
 function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function dayLabel(d: Date): string {
@@ -47,7 +50,7 @@ export default function AddTransactionPage() {
       if (prev === 'category' && (data.type === 'Перевод')) continue;
       if (prev === 'currency' && data.type !== 'Обмен валюты') continue;
       if (prev === 'exchange_rate' && data.type !== 'Обмен валюты') continue;
-      if (prev === 'hours' && !(data.type === 'Доход' && (data.category === 'Зарплата' || data.category === 'Чаевые'))) continue;
+      if (prev === 'hours' && !(data.type === 'Доход' && (data.category === 'Чаевые'))) continue;
       setStep(prev);
       return;
     }
@@ -98,7 +101,7 @@ export default function AddTransactionPage() {
 
   const afterAmount = () => {
     if (data.type === 'Обмен валюты') setStep('exchange_rate');
-    else if (data.type === 'Доход' && (data.category === 'Зарплата' || data.category === 'Чаевые')) setStep('hours');
+    else if (data.type === 'Доход' && (data.category === 'Чаевые')) setStep('hours');
     else setStep('comment');
   };
 
@@ -141,7 +144,7 @@ export default function AddTransactionPage() {
     if (s === 'category' && data.type === 'Перевод') return false;
     if (s === 'currency' && data.type !== 'Обмен валюты') return false;
     if (s === 'exchange_rate' && data.type !== 'Обмен валюты') return false;
-    if (s === 'hours' && !(data.type === 'Доход' && (data.category === 'Зарплата' || data.category === 'Чаевые'))) return false;
+    if (s === 'hours' && !(data.type === 'Доход' && (data.category === 'Чаевые'))) return false;
     return true;
   }).length;
   const currentStepIdx = stepOrder.slice(0, stepOrder.indexOf(step) + 1).filter((s) => {
@@ -149,7 +152,7 @@ export default function AddTransactionPage() {
     if (s === 'category' && data.type === 'Перевод') return false;
     if (s === 'currency' && data.type !== 'Обмен валюты') return false;
     if (s === 'exchange_rate' && data.type !== 'Обмен валюты') return false;
-    if (s === 'hours' && !(data.type === 'Доход' && (data.category === 'Зарплата' || data.category === 'Чаевые'))) return false;
+    if (s === 'hours' && !(data.type === 'Доход' && (data.category === 'Чаевые'))) return false;
     return true;
   }).length;
   const progressPct = totalSteps > 0 ? (currentStepIdx / totalSteps) * 100 : 0;

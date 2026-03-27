@@ -98,7 +98,7 @@ export default function DashboardPage() {
         account: refs?.accounts?.[0] || 'Наличные',
         amount,
         category: category || (refs?.categories?.[0] || 'Продукты'),
-        date: new Date().toISOString().split('T')[0],
+        date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
       });
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       showToast(`-${amount} BYN${category ? ` · ${category}` : ''}`, 'success');
@@ -162,7 +162,15 @@ export default function DashboardPage() {
         {/* R6: Account chips */}
         <div className="hero-accounts" role="list" aria-label="Счета">
           {summary.accounts.map((acc) => (
-            <div className="hero-account-chip" key={acc.name} role="listitem">
+            <div
+              className="hero-account-chip"
+              key={acc.name}
+              role="button"
+              tabIndex={0}
+              style={{ cursor: 'pointer' }}
+              onClick={() => navigate(`/history?account=${encodeURIComponent(acc.name)}`)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/history?account=${encodeURIComponent(acc.name)}`); }}}
+            >
               <span>{acc.emoji || '💳'}</span>
               <span className="chip-name">{acc.name}</span>
               <span className="amount">{formatMoney(acc.current, acc.currency)}</span>
