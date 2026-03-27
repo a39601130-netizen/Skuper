@@ -17,6 +17,7 @@ import type {
   SetCreateData,
   WorkoutSetData,
   NextWorkoutFull,
+  ExerciseWithDetails,
 } from '../types';
 
 const API_BASE = '/api';
