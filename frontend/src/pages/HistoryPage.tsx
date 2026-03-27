@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTransactions, deleteTransaction } from '../api/client';
 import { ListPageSkeleton } from '../components/Skeleton';
@@ -66,16 +66,38 @@ export default function HistoryPage() {
     <div className="page">
       <h1 className="page-title">История</h1>
 
-      {accountFilter && (
-        <div className="filter-chip-bar">
-          <span className="filter-chip">
-            {accountFilter}
-            <button className="filter-chip-remove" onClick={() => setSearchParams({})} aria-label="Сбросить фильтр">
-              <X size={14} />
-            </button>
-          </span>
-        </div>
-      )}
+      {accountFilter && (() => {
+        const expense = transactions.filter(t => t.type === 'Расход').reduce((s, t) => s + Number(t.amount), 0);
+        const income = transactions.filter(t => t.type === 'Доход').reduce((s, t) => s + Number(t.amount), 0);
+        return (
+          <div>
+            <div className="filter-chip-bar">
+              <span className="filter-chip">
+                {accountFilter}
+                <button className="filter-chip-remove" onClick={() => setSearchParams({})} aria-label="Сбросить фильтр">
+                  <X size={14} />
+                </button>
+              </span>
+            </div>
+            {transactions.length > 0 && (
+              <div className="grid-2" style={{ marginBottom: 12 }}>
+                {expense > 0 && (
+                  <div className="card" style={{ padding: '10px 14px' }}>
+                    <div className="card-title">Расходы</div>
+                    <div className="stat-value amount expense">-{expense.toFixed(2)} BYN</div>
+                  </div>
+                )}
+                {income > 0 && (
+                  <div className="card" style={{ padding: '10px 14px' }}>
+                    <div className="card-title">Доходы</div>
+                    <div className="stat-value amount income">+{income.toFixed(2)} BYN</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {transactions.length === 0 ? (
         <div className="empty">

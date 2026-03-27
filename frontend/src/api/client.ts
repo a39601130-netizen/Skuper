@@ -114,6 +114,9 @@ export const getExercises = (day?: 'A' | 'B') =>
 export const getExerciseProgress = (exerciseId: string) =>
   request<ExerciseProgress>(`/exercises/${exerciseId}/progress`);
 
+export const getExerciseAlternative = (exerciseId: string) =>
+  request<ExerciseWithDetails>(`/exercises/${exerciseId}/alternative`);
+
 // --- Workout Session ---
 export const getNextWorkoutFull = () => request<NextWorkoutFull>('/workouts/next');
 

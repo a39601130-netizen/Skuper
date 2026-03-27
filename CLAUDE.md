@@ -49,7 +49,7 @@ api/
     categories.py                — GET /api/categories, GET /api/categories/references
     stats.py                     — GET /api/stats/monthly|income|weekly|daily-spending
     workouts.py                  — GET/POST /api/workouts, PUT complete, POST sets, GET calendar/compare
-    exercises.py                 — GET /api/exercises, GET progress, PUT weight
+    exercises.py                 — GET /api/exercises, GET progress, GET alternative, PUT weight
     advisor.py                   — POST /api/advisor/ask, GET analysis, GET insights
     recurring.py                 — GET/POST /api/recurring, DELETE, POST apply
 

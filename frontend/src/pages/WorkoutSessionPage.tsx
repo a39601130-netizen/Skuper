@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTelegram } from '../hooks/useTelegram';
 import {
-  getNextWorkoutFull, createWorkout, addWorkoutSet, completeWorkout,
+  getNextWorkoutFull, createWorkout, addWorkoutSet, completeWorkout, getExerciseAlternative,
 } from '../api/client';
 import type {
   NextWorkoutFull, ExerciseWithDetails, WorkoutFull,
@@ -44,21 +44,12 @@ const WARMUP_PHASES = [
   },
 ];
 
-// ---- Exercise alternatives ----
-const EXERCISE_ALTERNATIVES: Record<string, Partial<ExerciseWithDetails> & { exercise_id: string; name: string }> = {
-  deadlift: { exercise_id: 'deadlift_alt', name: 'Гиперэкстензия с весом', category: 'compound', default_sets: 3, reps_min: 10, reps_max: 12, rest_seconds: 90, weight_step: 2.5, notes: 'Блин к груди. До прямой линии — не выше. Пауза 1-2 сек вверху.' },
-  bench_press: { exercise_id: 'bench_press_alt', name: 'Жим гантелей лёжа', category: 'compound', default_sets: 4, reps_min: 6, reps_max: 8, rest_seconds: 150, weight_step: 2.5, notes: 'Лопатки сведены. Гантели к груди, выжимай сводя друг к другу.' },
-  seated_cable_row: { exercise_id: 'seated_cable_row_alt', name: 'Тяга гантели в наклоне', category: 'compound', default_sets: 3, reps_min: 10, reps_max: 12, rest_seconds: 90, weight_step: 2.5, notes: 'Одна рука и колено на скамье. Тяни к бедру. Каждая сторона.' },
-  leg_extension: { exercise_id: 'leg_extension_alt', name: 'Гоблет-присед', category: 'isolation', default_sets: 2, reps_min: 12, reps_max: 15, rest_seconds: 60, weight_step: 2.0, notes: 'Гантель у груди. Садись вниз, локти между коленей. Грудь вперёд.' },
-  face_pull: { exercise_id: 'face_pull_alt', name: 'Разведение в наклоне', category: 'isolation', default_sets: 2, reps_min: 15, reps_max: 20, rest_seconds: 60, weight_step: 1.0, notes: 'Наклон 60-70°. Лёгкий вес. Сведи лопатки вверху.' },
-  tricep_pushdown: { exercise_id: 'tricep_pushdown_alt', name: 'Французский жим с гантелей', category: 'isolation', default_sets: 2, reps_min: 12, reps_max: 15, rest_seconds: 60, weight_step: 1.0, notes: 'Гантель за головой двумя руками. Локти вверх, прижаты к голове.' },
-  hip_thrust: { exercise_id: 'hip_thrust_alt', name: 'Румынская тяга с гантелями', category: 'compound', default_sets: 3, reps_min: 10, reps_max: 12, rest_seconds: 90, weight_step: 2.5, notes: 'Колени зафиксированы. Таз назад. Спина нейтральная.' },
-  ohp: { exercise_id: 'ohp_alt', name: 'Жим гантелей сидя', category: 'compound', default_sets: 3, reps_min: 6, reps_max: 8, rest_seconds: 120, weight_step: 2.5, notes: 'Спинка 80-85°. Гантели на уровне ушей.' },
-  lat_pulldown: { exercise_id: 'lat_pulldown_alt', name: 'Подтягивания / гравитрон', category: 'compound', default_sets: 3, reps_min: 8, reps_max: 10, rest_seconds: 90, weight_step: 2.5, notes: 'Хват шире плеч. Тяни грудь к перекладине.' },
-  leg_press: { exercise_id: 'leg_press_alt', name: 'Болгарский сплит-присед', category: 'compound', default_sets: 2, reps_min: 10, reps_max: 12, rest_seconds: 90, weight_step: 2.5, notes: 'Задняя нога на скамье. Голень вертикальна. Через пятку.' },
-  lateral_raise: { exercise_id: 'lateral_raise_alt', name: 'В кроссовере (в стороны)', category: 'isolation', default_sets: 2, reps_min: 12, reps_max: 15, rest_seconds: 60, weight_step: 1.0, notes: 'Боком к блоку. Дальняя рука тянет. Каждая сторона.' },
-  bicep_curl: { exercise_id: 'bicep_curl_alt', name: 'Бицепс в блоке', category: 'isolation', default_sets: 2, reps_min: 12, reps_max: 15, rest_seconds: 60, weight_step: 1.0, notes: 'Нижний блок, прямая или EZ-рукоять. Постоянное натяжение.' },
-};
+// Упражнения с альтернативой (exercise_id без суффикса _alt)
+const EXERCISES_WITH_ALT = new Set([
+  'deadlift', 'bench_press', 'seated_cable_row', 'leg_extension',
+  'face_pull', 'tricep_pushdown', 'hip_thrust', 'ohp',
+  'lat_pulldown', 'leg_press', 'lateral_raise', 'bicep_curl',
+]);
 
 const STORAGE_KEY = 'workout_session';
 
@@ -119,6 +110,9 @@ export default function WorkoutSessionPage() {
   // Summary
   const [summaryData, setSummaryData] = useState<WorkoutFull | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+
+  // Alternative loading
+  const [altLoading, setAltLoading] = useState(false);
 
   // ---- Load plan ----
   useEffect(() => {
@@ -334,12 +328,12 @@ export default function WorkoutSessionPage() {
     setStage('post');
   };
 
-  const handleAlternative = () => {
-    if (!plan || !currentEx) return;
+  const handleAlternative = async () => {
+    if (!plan || !currentEx || altLoading) return;
     haptic?.selectionChanged();
     const isAlt = !!originals[exIdx];
     if (isAlt) {
-      // Switch back to original
+      // Вернуть оригинал
       const original = originals[exIdx];
       const newExercises = [...exercises];
       newExercises[exIdx] = original;
@@ -348,24 +342,30 @@ export default function WorkoutSessionPage() {
       setSetWeight(original.current_weight || 0);
       setSetReps(original.reps_max || 10);
     } else {
-      // Switch to alternative
-      const alt = EXERCISE_ALTERNATIVES[currentEx.exercise_id];
-      if (!alt) return;
-      const altEx: ExerciseWithDetails = {
-        ...currentEx,
-        ...alt,
-        current_weight: 0, // fresh weight for alternative
-        target_reps: `${alt.reps_min}-${alt.reps_max}`,
-        status: '',
-        last_sets: [],
-        history: [],
-      };
-      setOriginals(prev => ({ ...prev, [exIdx]: currentEx }));
-      const newExercises = [...exercises];
-      newExercises[exIdx] = altEx;
-      setPlan({ ...plan, exercises: newExercises });
-      setSetWeight(0);
-      setSetReps(alt.reps_max || 10);
+      // Загрузить альтернативу из БД
+      setAltLoading(true);
+      try {
+        const alt = await getExerciseAlternative(currentEx.exercise_id);
+        const altEx: ExerciseWithDetails = {
+          ...currentEx,
+          ...alt,
+          target_reps: `${alt.reps_min}-${alt.reps_max}`,
+          status: '',
+          last_sets: [],
+          history: [],
+        };
+        setOriginals(prev => ({ ...prev, [exIdx]: currentEx }));
+        const newExercises = [...exercises];
+        newExercises[exIdx] = altEx;
+        setPlan({ ...plan, exercises: newExercises });
+        setSetWeight(alt.current_weight || 0);
+        setSetReps(alt.reps_max || 10);
+      } catch {
+        // Альтернатива не найдена — ничего не делаем
+        return;
+      } finally {
+        setAltLoading(false);
+      }
     }
     setSetNum(1);
     setShowRpe(false);
@@ -701,9 +701,9 @@ export default function WorkoutSessionPage() {
             <div className="ws-ex-counter">{exIdx + 1} / {totalExercises}</div>
             <h2>{currentEx.name}{originals[exIdx] ? ' (замена)' : ''}</h2>
             <p className="ws-meta">{currentEx.category}</p>
-            {(EXERCISE_ALTERNATIVES[currentEx.exercise_id] || originals[exIdx]) && (
-              <button className="ws-alt-btn" onClick={handleAlternative}>
-                🔄 {originals[exIdx] ? 'Вернуть оригинал' : 'Альтернатива'}
+            {(EXERCISES_WITH_ALT.has(currentEx.exercise_id) || originals[exIdx]) && (
+              <button className="ws-alt-btn" onClick={handleAlternative} disabled={altLoading}>
+                🔄 {altLoading ? 'Загрузка...' : originals[exIdx] ? 'Вернуть оригинал' : 'Альтернатива'}
               </button>
             )}
           </div>

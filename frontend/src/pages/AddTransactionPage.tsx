@@ -75,6 +75,10 @@ export default function AddTransactionPage() {
     const now = new Date();
     const maxDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     if (day > maxDay) return;
+    if (day > now.getDate()) {
+      showToast('Нельзя выбрать будущую дату', 'error');
+      return;
+    }
     const d = new Date(now.getFullYear(), now.getMonth(), day);
     selectDate(formatDate(d));
   };

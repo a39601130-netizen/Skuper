@@ -25,6 +25,15 @@ async def get_exercises(db: AsyncSession, day: Optional[str] = None) -> List[Dic
     return [_exercise_to_dict(e) for e in exercises]
 
 
+async def get_exercise_by_id(db: AsyncSession, exercise_id: str) -> Optional[Dict]:
+    """Возвращает одно упражнение по exercise_id или None."""
+    result = await db.execute(
+        select(Exercise).where(Exercise.exercise_id == exercise_id, Exercise.is_active == True)
+    )
+    ex = result.scalar_one_or_none()
+    return _exercise_to_dict(ex) if ex else None
+
+
 async def get_current_weights(db: AsyncSession) -> Dict[str, Dict]:
     result = await db.execute(
         select(CurrentWeight).options(selectinload(CurrentWeight.exercise))
