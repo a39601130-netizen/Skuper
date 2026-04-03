@@ -76,6 +76,12 @@ export const deleteTransaction = (txId: number) =>
 // --- Accounts ---
 export const getAccounts = () => request<Account[]>('/accounts');
 
+export const updateAccountBalance = (accountId: number, balance: number) =>
+  request<Account>(`/accounts/${accountId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ balance }),
+  });
+
 // --- Categories ---
 export const getCategories = () => request<Category[]>('/categories');
 export const getReferences = () => request<References>('/categories/references');

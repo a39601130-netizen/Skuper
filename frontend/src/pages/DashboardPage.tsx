@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getMonthlySummary, createTransaction, getReferences } from '../api/client';
+import { getMonthlySummary, createTransaction, getReferences, updateAccountBalance } from '../api/client';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, TrendingUp, TrendingDown, AlertTriangle, Send, Plus } from 'lucide-react';
-import type { MonthlySummary, References } from '../types';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, TrendingUp, TrendingDown, AlertTriangle, Send, Plus, Pencil } from 'lucide-react';
+import type { Account, MonthlySummary, References } from '../types';
 
 const MONTH_NAMES = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
@@ -38,6 +38,10 @@ export default function DashboardPage() {
   const [quickInput, setQuickInput] = useState('');
   const [quickLoading, setQuickLoading] = useState(false);
   const [refs, setRefs] = useState<References | null>(null);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [editBalance, setEditBalance] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+  const editInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
@@ -112,6 +116,25 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSaveBalance = async () => {
+    if (!editingAccount) return;
+    const val = parseFloat(editBalance.replace(',', '.'));
+    if (isNaN(val)) { showToast('Введите корректную сумму', 'error'); return; }
+    setEditLoading(true);
+    try {
+      await updateAccountBalance(editingAccount.id, val);
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+      showToast(`${editingAccount.name}: ${val.toFixed(2)} ${editingAccount.currency}`, 'success');
+      setEditingAccount(null);
+      load();
+    } catch {
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+      showToast('Ошибка сохранения', 'error');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   if (loading) return <DashboardSkeleton />;
   if (error) return (
     <div className="page">
@@ -162,21 +185,73 @@ export default function DashboardPage() {
         {/* R6: Account chips */}
         <div className="hero-accounts" role="list" aria-label="Счета">
           {summary.accounts.map((acc) => (
-            <div
-              className="hero-account-chip"
-              key={acc.name}
-              role="button"
-              tabIndex={0}
-              style={{ cursor: 'pointer' }}
-              onClick={() => navigate(`/history?account=${encodeURIComponent(acc.name)}`)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/history?account=${encodeURIComponent(acc.name)}`); }}}
-            >
-              <span>{acc.emoji || '💳'}</span>
-              <span className="chip-name">{acc.name}</span>
-              <span className="amount">{formatMoney(acc.current, acc.currency)}</span>
+            <div className="hero-account-chip" key={acc.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div
+                role="button"
+                tabIndex={0}
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}
+                onClick={() => navigate(`/history?account=${encodeURIComponent(acc.name)}`)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/history?account=${encodeURIComponent(acc.name)}`); }}}
+              >
+                <span>{acc.emoji || '💳'}</span>
+                <span className="chip-name">{acc.name}</span>
+                <span className="amount">{formatMoney(acc.current, acc.currency)}</span>
+              </div>
+              <button
+                aria-label={`Редактировать баланс ${acc.name}`}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: 'var(--text-secondary)', lineHeight: 1 }}
+                onClick={(e) => { e.stopPropagation(); setEditingAccount(acc); setEditBalance(String(acc.current)); setTimeout(() => editInputRef.current?.focus(), 50); }}
+              >
+                <Pencil size={14} />
+              </button>
             </div>
           ))}
         </div>
+
+        {/* Модальное окно редактирования баланса */}
+        {editingAccount && (
+          <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => setEditingAccount(null)}
+          >
+            <div
+              style={{ background: 'var(--surface)', borderRadius: 16, padding: 24, width: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ marginBottom: 12, fontWeight: 600, fontSize: 16 }}>
+                {editingAccount.emoji} {editingAccount.name}
+              </div>
+              <div style={{ marginBottom: 8, color: 'var(--text-secondary)', fontSize: 13 }}>Новый баланс ({editingAccount.currency})</div>
+              <input
+                ref={editInputRef}
+                type="number"
+                inputMode="decimal"
+                value={editBalance}
+                onChange={(e) => setEditBalance(e.target.value)}
+                onKeyDown={async (e) => { if (e.key === 'Enter') { await handleSaveBalance(); } if (e.key === 'Escape') { setEditingAccount(null); } }}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 18, boxSizing: 'border-box', marginBottom: 16 }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn"
+                  style={{ flex: 1 }}
+                  onClick={() => setEditingAccount(null)}
+                  disabled={editLoading}
+                >
+                  Отмена
+                </button>
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  onClick={handleSaveBalance}
+                  disabled={editLoading || !editBalance.trim()}
+                >
+                  {editLoading ? '...' : 'Сохранить'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Month selector */}

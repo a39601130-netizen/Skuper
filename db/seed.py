@@ -12,11 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 INITIAL_ACCOUNTS = [
-    {"name": "Наличные",    "currency": "BYN", "emoji": "💵", "sort_order": 1},
-    {"name": "Карта",       "currency": "BYN", "emoji": "🔴", "sort_order": 2},
-    {"name": "На Аренду",   "currency": "BYN", "emoji": "🏠", "sort_order": 3},
-    {"name": "USD",         "currency": "USD", "emoji": "🇺🇸", "sort_order": 4},
-    {"name": "EUR",         "currency": "EUR", "emoji": "🇪🇺", "sort_order": 5},
+    {"name": "Наличные", "currency": "BYN", "emoji": "💵", "sort_order": 1},
+    {"name": "Сбер",     "currency": "BYN", "emoji": "🟢", "sort_order": 2},
 ]
 
 INITIAL_CATEGORIES = [
@@ -145,13 +142,38 @@ async def seed_db():
 
 
 async def _seed_accounts(session: AsyncSession):
-    result = await session.execute(select(Account).limit(1))
-    if result.scalar_one_or_none():
+    result = await session.execute(select(Account))
+    existing = {a.name: a for a in result.scalars().all()}
+
+    if not existing:
+        # Первый запуск — просто создать
+        for data in INITIAL_ACCOUNTS:
+            data = dict(data)
+            data["emoji"] = config.CATEGORY_EMOJI.get(data["name"], data.get("emoji", "💳"))
+            session.add(Account(**data))
+        logger.info(f"Seeded {len(INITIAL_ACCOUNTS)} accounts")
         return
+
+    seed_names = {d["name"] for d in INITIAL_ACCOUNTS}
+
+    # Деактивировать счета не в списке
+    for name, acc in existing.items():
+        if name not in seed_names and acc.is_active:
+            acc.is_active = False
+            logger.info(f"Deactivated account: {name}")
+
+    # Добавить новые / реактивировать
     for data in INITIAL_ACCOUNTS:
+        data = dict(data)
         data["emoji"] = config.CATEGORY_EMOJI.get(data["name"], data.get("emoji", "💳"))
-        session.add(Account(**data))
-    logger.info(f"Seeded {len(INITIAL_ACCOUNTS)} accounts")
+        if data["name"] in existing:
+            acc = existing[data["name"]]
+            if not acc.is_active:
+                acc.is_active = True
+                logger.info(f"Reactivated account: {data['name']}")
+        else:
+            session.add(Account(**data))
+            logger.info(f"Added account: {data['name']}")
 
 
 async def _seed_categories(session: AsyncSession):

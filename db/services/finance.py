@@ -36,6 +36,17 @@ async def get_accounts(db: AsyncSession) -> List[Account]:
     return list(result.scalars().all())
 
 
+async def update_account_balance(db: AsyncSession, account_id: int, new_balance: float) -> Optional[Account]:
+    result = await db.execute(select(Account).where(Account.id == account_id, Account.is_active == True))
+    account = result.scalar_one_or_none()
+    if not account:
+        return None
+    account.balance = new_balance
+    await db.commit()
+    await db.refresh(account)
+    return account
+
+
 async def get_categories(db: AsyncSession, type_filter: Optional[str] = None) -> List[Category]:
     q = select(Category).where(Category.is_active == True)
     if type_filter:
@@ -311,6 +322,7 @@ async def get_monthly_summary(
     accounts = await get_accounts(db)
     accounts_data = [
         {
+            "id": a.id,
             "name": a.name,
             "currency": a.currency,
             "current": a.balance,
