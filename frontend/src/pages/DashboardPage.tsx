@@ -134,6 +134,13 @@ export default function DashboardPage() {
     }
   };
 
+  const expenseCategories = useMemo(() =>
+    (summary?.categories ?? [])
+      .filter((c) => c.type === 'Расход' && c.spent > 0)
+      .sort((a, b) => b.spent - a.spent),
+    [summary?.categories]
+  );
+
   if (loading) return <DashboardSkeleton />;
   if (error) return (
     <div className="page">
@@ -159,13 +166,6 @@ export default function DashboardPage() {
         </button>
       </div>
     </div>
-  );
-
-  const expenseCategories = useMemo(() =>
-    summary.categories
-      .filter((c) => c.type === 'Расход' && c.spent > 0)
-      .sort((a, b) => b.spent - a.spent),
-    [summary.categories]
   );
 
   const daysLeft = getDaysLeft();
