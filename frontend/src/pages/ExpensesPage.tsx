@@ -74,6 +74,13 @@ export default function ExpensesPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const expenseCategories = useMemo(() =>
+    (summary?.categories ?? [])
+      .filter((c) => c.type === 'Расход' && c.spent > 0)
+      .sort((a, b) => b.spent - a.spent),
+    [summary?.categories]
+  );
+
   if (loading) return <DashboardSkeleton />;
   if (error) return (
     <div className="page">
@@ -91,13 +98,6 @@ export default function ExpensesPage() {
         <div className="empty-text">Нет данных</div>
       </div>
     </div>
-  );
-
-  const expenseCategories = useMemo(() =>
-    summary.categories
-      .filter((c) => c.type === 'Расход' && c.spent > 0)
-      .sort((a, b) => b.spent - a.spent),
-    [summary.categories]
   );
 
   const totalExpense = summary.total_expense;
