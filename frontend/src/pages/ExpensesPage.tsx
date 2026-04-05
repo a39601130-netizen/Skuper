@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { getMonthlySummary, getTransactions } from '../api/client';
@@ -93,9 +93,12 @@ export default function ExpensesPage() {
     </div>
   );
 
-  const expenseCategories = summary.categories
-    .filter((c) => c.type === 'Расход' && c.spent > 0)
-    .sort((a, b) => b.spent - a.spent);
+  const expenseCategories = useMemo(() =>
+    summary.categories
+      .filter((c) => c.type === 'Расход' && c.spent > 0)
+      .sort((a, b) => b.spent - a.spent),
+    [summary.categories]
+  );
 
   const totalExpense = summary.total_expense;
 

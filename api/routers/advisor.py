@@ -52,7 +52,8 @@ async def ask(
             logger.exception("Failed to load workout context for advisor")
 
     if data.screen_context:
-        context += f"\n\nПользователь на экране: {data.screen_context}"
+        sanitized_ctx = data.screen_context[:200].replace('\n', ' ').replace('\r', '')
+        context += f"\n\nТекущий экран пользователя: {sanitized_ctx}"
 
     if data.history:
         context += "\n\nИстория диалога:\n"

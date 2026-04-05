@@ -27,13 +27,13 @@ def create_app() -> FastAPI:
         openapi_url=None if IS_PRODUCTION else "/api/openapi.json",
     )
 
+    cors_origins = ["https://budget-bot.duckdns.org"]
+    if not IS_PRODUCTION:
+        cors_origins += ["http://localhost:5173", "http://localhost:8000"]
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "https://budget-bot.duckdns.org",
-            "http://localhost:5173",
-            "http://localhost:8000",
-        ],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "X-Telegram-Init-Data"],
@@ -49,6 +49,9 @@ def create_app() -> FastAPI:
             _rate_limit_store[client_ip] = [
                 t for t in _rate_limit_store[client_ip] if now - t < RATE_WINDOW
             ]
+            if not _rate_limit_store[client_ip]:
+                del _rate_limit_store[client_ip]
+                return await call_next(request)
             if len(_rate_limit_store[client_ip]) >= RATE_LIMIT:
                 return JSONResponse(
                     {"detail": "Too many requests"},

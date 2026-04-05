@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentWeights, getExerciseProgress } from '../api/client';
 import { ListPageSkeleton } from '../components/Skeleton';
@@ -25,6 +25,7 @@ export default function ExerciseProgressPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [progress, setProgress] = useState<ExerciseProgress | null>(null);
   const [progressLoading, setProgressLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const load = () => {
     setLoading(true); setError('');
@@ -42,21 +43,25 @@ export default function ExerciseProgressPage() {
       setProgress(null);
       return;
     }
+    // Отменяем предыдущий запрос
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setSelected(exerciseId);
     setProgressLoading(true);
     setProgress(null);
     try {
       const p = await getExerciseProgress(exerciseId);
-      setSelected((current) => {
-        if (current === exerciseId) {
-          setProgress(p);
-        }
-        return current;
-      });
+      if (!controller.signal.aborted) {
+        setProgress(p);
+        setProgressLoading(false);
+      }
     } catch {
-      setProgress(null);
-    } finally {
-      setProgressLoading(false);
+      if (!controller.signal.aborted) {
+        setProgress(null);
+        setProgressLoading(false);
+      }
     }
   };
 
