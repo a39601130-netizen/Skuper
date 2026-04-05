@@ -71,7 +71,7 @@ export default function AddTransactionPage() {
 
   const submitCustomDate = () => {
     const day = parseInt(customDay);
-    if (!day || day < 1) return;
+    if (isNaN(day) || day < 1) return;
     const now = new Date();
     const maxDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     if (day > maxDay) return;

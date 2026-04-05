@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getMonthlySummary, createTransaction, getReferences, updateAccountBalance } from '../api/client';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
@@ -43,7 +43,6 @@ export default function DashboardPage() {
   const [editLoading, setEditLoading] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const location = useLocation();
   const { showToast } = useToast();
 
   const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear();
@@ -66,8 +65,8 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [month, year]);
 
-  useEffect(load, [location.key, load]);
-  useEffect(() => { getReferences().then(setRefs).catch(() => {}); }, []);
+  useEffect(load, [load]);
+  useEffect(() => { getReferences().then(setRefs).catch(console.error); }, []);
 
   // R2: Quick input parser "500 продукты" or "100"
   const handleQuickSubmit = async () => {
@@ -162,9 +161,12 @@ export default function DashboardPage() {
     </div>
   );
 
-  const expenseCategories = summary.categories
-    .filter((c) => c.type === 'Расход' && c.spent > 0)
-    .sort((a, b) => b.spent - a.spent);
+  const expenseCategories = useMemo(() =>
+    summary.categories
+      .filter((c) => c.type === 'Расход' && c.spent > 0)
+      .sort((a, b) => b.spent - a.spent),
+    [summary.categories]
+  );
 
   const daysLeft = getDaysLeft();
   const netBalance = (summary.total_income || 0) - (summary.total_expense || 0);
