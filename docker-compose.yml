@@ -66,6 +66,7 @@ networks:
   budget_net:
     driver: bridge
   lila_net:
+    external: true
     name: lila_bot_default
 
 volumes:
