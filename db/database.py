@@ -19,6 +19,12 @@ async def get_db():
 
 
 async def init_db():
-    """Create all tables."""
+    """Create all tables and run migrations."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Миграция: добавить body_weight в workouts (если ещё нет)
+        await conn.execute(
+            __import__('sqlalchemy').text(
+                "ALTER TABLE workouts ADD COLUMN IF NOT EXISTS body_weight FLOAT"
+            )
+        )

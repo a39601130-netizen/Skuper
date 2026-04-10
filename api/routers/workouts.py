@@ -12,7 +12,7 @@ from db.services.workout import (
     get_current_weights, get_workout_history,
     determine_next_day, get_current_week_and_phase, get_exercises,
     create_workout, get_workout_by_id, add_workout_set, complete_workout,
-    get_exercise_progress, delete_workout,
+    get_exercise_progress, delete_workout, get_last_workout,
 )
 
 router = APIRouter(prefix="/api/workouts", tags=["workouts"])
@@ -29,6 +29,7 @@ class WorkoutCreate(BaseModel):
     sleep_quality: int = Field(..., ge=1, le=10)
     back_pain: int = Field(..., ge=1, le=10)
     emotional_wave: str
+    body_weight: Optional[float] = Field(None, ge=30, le=300)
 
 
 class SetCreate(BaseModel):
@@ -58,10 +59,11 @@ async def workout_history(
 
 @router.get("/next")
 async def next_workout(
+    day: Optional[str] = Query(None, pattern="^[AB]$"),
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    next_day = await determine_next_day(db)
+    next_day = day or await determine_next_day(db)
     phase = await get_current_week_and_phase(db)
     all_exercises = await get_exercises(db, day=next_day)
     exercises = [ex for ex in all_exercises if ex.get("order", 0) < 100]
@@ -80,7 +82,10 @@ async def next_workout(
         progress = await get_exercise_progress(db, eid)
         ex["history"] = progress.get("history_by_workout", [])[:3]
 
-    return {"next_day": next_day, "phase": phase, "exercises": exercises}
+    last_workout = await get_last_workout(db)
+    last_body_weight = last_workout.get("body_weight") if last_workout else None
+
+    return {"next_day": next_day, "phase": phase, "exercises": exercises, "last_body_weight": last_body_weight}
 
 
 @router.get("/weights")
@@ -117,6 +122,7 @@ async def create_workout_endpoint(
         sleep_quality=data.sleep_quality,
         back_pain=data.back_pain,
         emotional_wave=data.emotional_wave,
+        body_weight=data.body_weight,
     )
     return result
 

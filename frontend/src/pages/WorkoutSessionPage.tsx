@@ -18,6 +18,7 @@ interface PreWorkoutData {
   sleep_quality: number;
   back_pain: number;
   emotional_wave: string;
+  body_weight: number;
 }
 
 interface SetEntry {
@@ -79,9 +80,9 @@ export default function WorkoutSessionPage() {
 
   // Pre-workout
   const [pre, setPre] = useState<PreWorkoutData>({
-    energy_before: 7, sleep_hours: 7, sleep_quality: 7, back_pain: 1, emotional_wave: '',
+    energy_before: 7, sleep_hours: 7, sleep_quality: 7, back_pain: 1, emotional_wave: '', body_weight: 0,
   });
-  const [preStep, setPreStep] = useState(0); // 0-4
+  const [preStep, setPreStep] = useState(0); // 0-5
 
   // Warmup
   const [warmupDone, setWarmupDone] = useState<boolean[]>([false, false, false]);
@@ -114,6 +115,9 @@ export default function WorkoutSessionPage() {
   // Alternative loading
   const [altLoading, setAltLoading] = useState(false);
 
+  // Day override (A/B)
+  const [dayLoading, setDayLoading] = useState(false);
+
   // ---- Load plan ----
   useEffect(() => {
     // Check for saved session — verify workout still exists
@@ -128,7 +132,12 @@ export default function WorkoutSessionPage() {
             setSetNum((saved.setNum as number) || 1);
             setSetsLog((saved.setsLog as Record<string, SetEntry[]>) || {});
             setWarmupDone((saved.warmupDone as boolean[]) || [false, false, false]);
-            setStage('exercise');
+            if (saved.energyAfter) setEnergyAfter(saved.energyAfter as number);
+            if (saved.workoutNotes) setWorkoutNotes(saved.workoutNotes as string);
+            // Восстанавливаем точный этап (warmup/exercise/rest/post)
+            const savedStage = saved.stage as Stage;
+            const validStages: Stage[] = ['warmup', 'exercise', 'rest', 'post'];
+            setStage(validStages.includes(savedStage) ? savedStage : 'exercise');
           })
           .catch(() => {
             // Workout was deleted — clear stale session and start fresh
@@ -144,6 +153,9 @@ export default function WorkoutSessionPage() {
     getNextWorkoutFull()
       .then((data) => {
         setPlan(data);
+        if (data.last_body_weight) {
+          setPre(p => ({ ...p, body_weight: data.last_body_weight! }));
+        }
         setStage('pre');
       })
       .catch((e) => setError(e.message));
@@ -151,10 +163,10 @@ export default function WorkoutSessionPage() {
 
   // ---- Auto-save ----
   useEffect(() => {
-    if (workoutId && plan && stage === 'exercise') {
-      saveSession({ workoutId, plan, exIdx, setNum, setsLog, warmupDone });
+    if (workoutId && plan && ['warmup', 'exercise', 'rest', 'post'].includes(stage)) {
+      saveSession({ workoutId, plan, exIdx, setNum, setsLog, warmupDone, stage, energyAfter, workoutNotes });
     }
-  }, [workoutId, exIdx, setNum, setsLog, stage]);
+  }, [workoutId, exIdx, setNum, setsLog, stage, warmupDone, energyAfter, workoutNotes]);
 
   // ---- Current exercise ----
   const exercises = useMemo(() => plan?.exercises || [], [plan]);
@@ -177,23 +189,33 @@ export default function WorkoutSessionPage() {
   };
 
   // ---- Pre-workout handlers ----
-  const preLabels = ['Энергия', 'Часы сна', 'Качество сна', 'Боль в спине', 'Эмоц. волна'];
+  const preLabels = ['Энергия', 'Часы сна', 'Качество сна', 'Боль в спине', 'Эмоц. волна', 'Вес тела'];
 
   const handlePreNext = async () => {
     haptic?.selectionChanged();
-    if (preStep < 4) {
+    if (preStep < 5) {
       setPreStep(preStep + 1);
       return;
     }
-    // All pre-workout data collected — create workout
+    // All pre-workout data collected — create workout (or skip if already created)
     if (!plan) return;
+    if (workoutId) {
+      // Тренировка уже создана (вернулись назад из warmup) — просто переходим
+      setStage('warmup');
+      return;
+    }
     setSaving(true);
     try {
       const result = await createWorkout({
         day_type: plan.next_day,
         week: plan.phase.current_week,
         phase: plan.phase.phase_name,
-        ...pre,
+        energy_before: pre.energy_before,
+        sleep_hours: pre.sleep_hours,
+        sleep_quality: pre.sleep_quality,
+        back_pain: pre.back_pain,
+        emotional_wave: pre.emotional_wave,
+        body_weight: pre.body_weight || undefined,
       });
       setWorkoutId(result.id);
       setStage('warmup');
@@ -206,6 +228,54 @@ export default function WorkoutSessionPage() {
 
   const handlePreBack = () => {
     if (preStep > 0) setPreStep(preStep - 1);
+  };
+
+  const handleDaySwitch = async (newDay: string) => {
+    if (!plan || newDay === plan.next_day || dayLoading) return;
+    haptic?.selectionChanged();
+    setDayLoading(true);
+    try {
+      const data = await getNextWorkoutFull(newDay);
+      setPlan(data);
+      if (data.last_body_weight) {
+        setPre(p => ({ ...p, body_weight: data.last_body_weight! }));
+      }
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setDayLoading(false);
+    }
+  };
+
+  // ---- Back navigation handlers ----
+  const handleBackFromWarmup = () => {
+    haptic?.selectionChanged();
+    setPreStep(5); // Последний pre-step
+    setStage('pre');
+  };
+
+  const handleBackFromRpe = () => {
+    haptic?.selectionChanged();
+    setShowRpe(false);
+  };
+
+  const handlePrevExercise = () => {
+    if (exIdx <= 0) return;
+    haptic?.selectionChanged();
+    const prevIdx = exIdx - 1;
+    setExIdx(prevIdx);
+    initExercise(prevIdx);
+  };
+
+  const handleBackFromPost = () => {
+    haptic?.selectionChanged();
+    // Возвращаемся к последнему упражнению
+    const lastIdx = totalExercises - 1;
+    if (lastIdx >= 0) {
+      setExIdx(lastIdx);
+      initExercise(lastIdx);
+      setStage('exercise');
+    }
   };
 
   // ---- Warmup handlers ----
@@ -550,7 +620,18 @@ export default function WorkoutSessionPage() {
       {stage === 'pre' && plan && (
         <div className="ws-stage">
           <div className="ws-header">
-            <h2>День {plan.next_day}</h2>
+            <div className="ws-day-switch">
+              {['A', 'B'].map(d => (
+                <button
+                  key={d}
+                  className={`ws-day-btn ${plan.next_day === d ? 'active' : ''}`}
+                  onClick={() => handleDaySwitch(d)}
+                  disabled={dayLoading}
+                >
+                  День {d}
+                </button>
+              ))}
+            </div>
             <p className="ws-meta">
               {plan.phase.phase_name} &middot; Неделя {plan.phase.current_week} &middot; RPE {plan.phase.rpe_min}-{plan.phase.rpe_max}
             </p>
@@ -639,6 +720,32 @@ export default function WorkoutSessionPage() {
             </div>
           )}
 
+          {preStep === 5 && (
+            <div className="ws-card">
+              <h3>Вес тела</h3>
+              <p className="ws-hint">Для контроля прогресса (необязательно)</p>
+              <div className="ws-input-row">
+                <span className="ws-input-label">кг</span>
+                <div className="ws-input-control">
+                  <button className="ws-adj-btn" onClick={() => { setPre({ ...pre, body_weight: Math.max(0, (pre.body_weight || 0) - 0.5) }); haptic?.selectionChanged(); }}>
+                    -0.5
+                  </button>
+                  <input
+                    type="number" inputMode="decimal"
+                    className="ws-weight-input"
+                    placeholder="0.0"
+                    value={pre.body_weight || ''}
+                    onChange={(e) => setPre({ ...pre, body_weight: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    onFocus={(e) => { if (Number(e.target.value) === 0) setPre({ ...pre, body_weight: 0 }); (e.target as HTMLInputElement).select(); }}
+                  />
+                  <button className="ws-adj-btn" onClick={() => { setPre({ ...pre, body_weight: (pre.body_weight || 0) + 0.5 }); haptic?.selectionChanged(); }}>
+                    +0.5
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="ws-actions">
             {preStep > 0 && (
               <button className="btn btn-ghost" onClick={handlePreBack}>Назад</button>
@@ -649,7 +756,7 @@ export default function WorkoutSessionPage() {
               disabled={saving || (preStep === 4 && !pre.emotional_wave)}
               onClick={handlePreNext}
             >
-              {saving ? 'Создаю...' : preStep < 4 ? 'Далее' : 'Начать разминку'}
+              {saving ? 'Создаю...' : preStep < 5 ? 'Далее' : 'Начать разминку'}
             </button>
           </div>
         </div>
@@ -684,11 +791,14 @@ export default function WorkoutSessionPage() {
           ))}
 
           <div className="ws-actions">
+            <button className="btn btn-ghost" onClick={handleBackFromWarmup}>
+              Назад
+            </button>
             <button className="btn btn-ghost" onClick={handleWarmupDone}>
               Пропустить
             </button>
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleWarmupDone}>
-              Перейти к упражнениям
+              К упражнениям
             </button>
           </div>
         </div>
@@ -786,8 +896,10 @@ export default function WorkoutSessionPage() {
                   <input
                     type="number" inputMode="decimal"
                     className="ws-weight-input"
-                    value={setWeight}
-                    onChange={(e) => setSetWeight(Number(e.target.value))}
+                    placeholder="0"
+                    value={setWeight || ''}
+                    onChange={(e) => setSetWeight(e.target.value === '' ? 0 : Number(e.target.value))}
+                    onFocus={(e) => (e.target as HTMLInputElement).select()}
                   />
                   <button className="ws-adj-btn" onClick={() => { setSetWeight(setWeight + (currentEx.weight_step || 2.5)); haptic?.selectionChanged(); }}>
                     +{currentEx.weight_step || 2.5}
@@ -805,8 +917,10 @@ export default function WorkoutSessionPage() {
                   <input
                     type="number" inputMode="numeric"
                     className="ws-weight-input"
-                    value={setReps}
-                    onChange={(e) => setSetReps(Number(e.target.value))}
+                    placeholder="0"
+                    value={setReps || ''}
+                    onChange={(e) => setSetReps(e.target.value === '' ? 0 : Number(e.target.value))}
+                    onFocus={(e) => (e.target as HTMLInputElement).select()}
                   />
                   <button className="ws-adj-btn" onClick={() => { setSetReps(setReps + 1); haptic?.selectionChanged(); }}>
                     +1
@@ -829,6 +943,9 @@ export default function WorkoutSessionPage() {
               <div className="ws-card-title">
                 {setWeight} кг x {setReps} — Насколько тяжело?
               </div>
+              <button className="btn btn-ghost" style={{ marginBottom: 8, fontSize: 13 }} onClick={handleBackFromRpe}>
+                Изменить вес/повторения
+              </button>
               <div className="ws-rpe-grid">
                 {[5, 6, 7, 8, 9, 10].map(r => {
                   const desc = r === 5 ? 'Легко' : r === 6 ? 'Умеренно' : r === 7 ? 'Норм' :
@@ -852,13 +969,18 @@ export default function WorkoutSessionPage() {
 
           {/* Exercise actions */}
           <div className="ws-actions">
+            {exIdx > 0 && (
+              <button className="btn btn-ghost" onClick={handlePrevExercise}>
+                Пред.
+              </button>
+            )}
             {exIdx < totalExercises - 1 && (
               <button className="btn btn-ghost" onClick={handleExerciseLater}>
-                ⏬ Позже
+                Позже
               </button>
             )}
             <button className="btn btn-ghost" onClick={handleSkipExercise}>
-              Пропустить
+              Далее
             </button>
             <button className="btn btn-ghost" onClick={handleFinishEarly}>
               Завершить
@@ -915,14 +1037,19 @@ export default function WorkoutSessionPage() {
             />
           </div>
 
-          <button
-            className="btn btn-primary btn-full"
-            onClick={handleComplete}
-            disabled={saving}
-            style={{ padding: '14px 0', fontSize: 16 }}
-          >
-            {saving ? 'Сохраняю...' : 'Завершить тренировку'}
-          </button>
+          <div className="ws-actions">
+            <button className="btn btn-ghost" onClick={handleBackFromPost}>
+              Назад к упражнениям
+            </button>
+            <button
+              className="btn btn-primary"
+              style={{ flex: 1, padding: '14px 0', fontSize: 16 }}
+              onClick={handleComplete}
+              disabled={saving}
+            >
+              {saving ? 'Сохраняю...' : 'Завершить тренировку'}
+            </button>
+          </div>
         </div>
       )}
 

@@ -117,7 +117,7 @@ scripts/
 - **Transaction**: id, date, type, account_id, category_id, amount, comment, hours, synced_to_sheets
 - **Exercise**: id, exercise_id, name, day (A/B), category, weight_step, reps_min, reps_max, rest_seconds, default_sets
 - **Phase**: id, name, weeks, rpe_min, rpe_max, sets_modifier
-- **Workout**: id, date, day_type, week, phase, energy_before, energy_after, sleep_hours, sleep_quality, back_pain, emotional_wave, notes
+- **Workout**: id, date, day_type, week, phase, energy_before, energy_after, sleep_hours, sleep_quality, back_pain, emotional_wave, body_weight, notes
 - **WorkoutSet**: id, workout_id, exercise_id, set_number, weight, reps, rpe
 - **CurrentWeight**: id, exercise_id, weight, target_reps, last_sets (JSON), status
 - **RecurringTransaction**: id, name, type, account_id, category_id, amount, currency, frequency, next_date, is_active

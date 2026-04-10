@@ -125,7 +125,8 @@ export const getExerciseAlternative = (exerciseId: string) =>
   request<ExerciseWithDetails>(`/exercises/${exerciseId}/alternative`);
 
 // --- Workout Session ---
-export const getNextWorkoutFull = () => request<NextWorkoutFull>('/workouts/next');
+export const getNextWorkoutFull = (day?: string) =>
+  request<NextWorkoutFull>(day ? `/workouts/next?day=${day}` : '/workouts/next');
 
 export const createWorkout = (data: WorkoutCreateData) =>
   request<WorkoutFull>('/workouts', {

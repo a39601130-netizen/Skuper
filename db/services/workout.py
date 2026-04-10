@@ -335,6 +335,7 @@ async def create_workout(
     sleep_quality: int,
     back_pain: int,
     emotional_wave: str,
+    body_weight: float | None = None,
 ) -> Dict:
     """Создать новую тренировку."""
     workout = Workout(
@@ -347,6 +348,7 @@ async def create_workout(
         sleep_quality=sleep_quality,
         back_pain=back_pain,
         emotional_wave=emotional_wave,
+        body_weight=body_weight,
     )
     db.add(workout)
     await db.commit()
@@ -506,5 +508,6 @@ def _workout_to_dict(w: Workout) -> Dict:
         "sleep_quality": w.sleep_quality or "",
         "back_pain": w.back_pain or "",
         "emotional_wave": w.emotional_wave or "",
+        "body_weight": w.body_weight,
         "notes": w.notes or "",
     }

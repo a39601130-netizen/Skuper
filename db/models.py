@@ -135,6 +135,7 @@ class Workout(Base):
     sleep_quality: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     back_pain: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     emotional_wave: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    body_weight: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     synced_to_sheets: Mapped[bool] = mapped_column(Boolean, default=False)

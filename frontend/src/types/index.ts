@@ -244,6 +244,7 @@ export interface WorkoutCreateData {
   sleep_quality: number;
   back_pain: number;
   emotional_wave: string;
+  body_weight?: number;
 }
 
 export interface WorkoutFull {
@@ -258,6 +259,7 @@ export interface WorkoutFull {
   sleep_quality: number;
   back_pain: number;
   emotional_wave: string;
+  body_weight: number | null;
   notes: string;
   sets: WorkoutSetData[];
   progress_updates?: ProgressUpdate[];
@@ -302,6 +304,7 @@ export interface NextWorkoutFull {
     sets_modifier: number;
   };
   exercises: ExerciseWithDetails[];
+  last_body_weight: number | null;
 }
 
 // Advisor types

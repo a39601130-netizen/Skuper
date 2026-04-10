@@ -155,6 +155,32 @@
   gap: 8px;
 }
 
+/* Day switch (A/B) */
+.ws-day-switch {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.ws-day-btn {
+  padding: 8px 28px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ws-day-btn.active {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--text-primary);
+}
+
 .ws-wave-btn {
   flex: 1;
   display: flex;
